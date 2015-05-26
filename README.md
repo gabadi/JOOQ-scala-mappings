@@ -1,0 +1,1 @@
+# JOOQ-scala-mappingss
