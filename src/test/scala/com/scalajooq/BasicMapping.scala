@@ -8,9 +8,10 @@ import org.jooq.impl.{DSL, DataSourceConnectionProvider, DefaultConfiguration}
 import org.jooq.tools.jdbc.JDBCUtils
 import org.scalatest.{Matchers, WordSpec}
 
-class Bla extends WordSpec with Matchers {
+class BasicMapping extends WordSpec with Matchers {
 
    "bla" in DB.withRollback{ dsl =>
+     //db.test.public.Public.PUBLIC
      println(dsl.fetch("show tables"))
    }
 

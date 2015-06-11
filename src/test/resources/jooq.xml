@@ -1,0 +1,22 @@
+<configuration>
+  <jdbc>
+    <driver>${db.driver}</driver>
+    <url>${db.url}</url>
+  </jdbc>
+
+
+  <generator>
+    <name>org.jooq.util.ScalaGenerator</name>
+    <database>
+      <name>org.jooq.util.mysql.MySQLDatabase</name>
+      <includes>.*</includes>
+    </database>
+    <generate>
+      <records>true</records>
+    </generate>
+    <target>
+      <packageName>db.test</packageName>
+      <directory>target/scala-2.11/jooq/main</directory>
+    </target>
+  </generator>
+</configuration>

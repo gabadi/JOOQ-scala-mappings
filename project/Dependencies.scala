@@ -14,7 +14,7 @@ object Dependencies {
     "org.scala-lang"         % "scala-reflect"         % scalaV,
     "org.scalatest"         %% "scalatest"             % "2.2.5" % Test,
     "com.h2database"         % "h2"                    % "1.4.187" % Test,
-    "org.flywaydb"           % "flyway-core"           % "3.2.1" % Test,
+    "com.typesafe"           % "config"                % "1.2.1" % Test,
     "com.google.guava"       % "guava"                 % "18.0"
   )
 

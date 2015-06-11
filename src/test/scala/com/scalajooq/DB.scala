@@ -1,5 +1,6 @@
 package com.scalajooq
 
+import com.typesafe.config.ConfigFactory
 import org.h2.jdbcx.JdbcDataSource
 import org.jooq.{Configuration, TransactionalRunnable, DSLContext}
 import org.jooq.impl.{DSL, DataSourceConnectionProvider, DefaultConfiguration}
@@ -7,13 +8,13 @@ import org.jooq.tools.jdbc.JDBCUtils
 
 import scala.util.control.NonFatal
 
-/**
- * Created by gabadi on 6/9/15.
- */
 object DB {
 
+
   private lazy val dsl = {
-    val connectionString: String = "jdbc:h2:tcp://localhost:9092/~/target/testing;MODE=MYSQL"
+    val conf = ConfigFactory.load()
+
+    val connectionString: String = conf.getString("db.url")
 
     val configuration = new DefaultConfiguration()
 

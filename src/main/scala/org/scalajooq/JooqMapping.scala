@@ -1,35 +1,46 @@
-package org.scalajooq
+package com.scalajooq
 
-import com.google.common.base.CaseFormat._
 import com.google.common.base.CaseFormat.{LOWER_CAMEL, UPPER_UNDERSCORE}
 import org.jooq.impl.TableImpl
-import org.jooq._
+import org.jooq.{DSLContext, Record, RecordMapper, Table}
 
-import _root_.scala.language.experimental.macros
-import _root_.scala.reflect.macros.blackbox.Context
-import _root_.scala.reflect.macros.blackbox.Context
-import _root_.scala.reflect.runtime.{universe => ru, _}
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context
+import scala.reflect.runtime.{universe => ru}
 
 trait JooqMapping[R <: Record, E] extends RecordMapper[Record, E] {
+  override def map(record: Record): E = ???
+  /*
   val table: org.jooq.Table[R]
 
   val selectTable: org.jooq.Table[Record]
 
   lazy val fields = selectTable.fields()
 
+  lazy val aliasedFields = fields.map(f => withAlias(f))
+
+  def withAlias[T](field: org.jooq.Field[T]):org.jooq.Field[T] = field.as(field.toString)
+
   override def map(record: Record): E = toEntity(record)
 
-  def toEntity(record: Record): E
+  def toEntity(record: Record): E = toEntityAliased(record, false)
+
+  def toEntityAliased(record: Record, aliased: Boolean = true): E
 
   def toOptEntity[T >: R <: Record](record: Record, tabl: Table[T] = selectTable): Option[E] = {
     val isNull = fields.forall(f => null == record.getValue(f))
     if(isNull) None else Some(toEntity(record))
   }
 
+  def toOptEntityAliased[T >: R <: Record](record: Record, tabl: Table[T] = selectTable): Option[E] = {
+    val isNull = aliasedFields.forall(f => null == record.getValue(f))
+    if(isNull) None else Some(toEntityAliased(record))
+  }
+
   def toRecord(record: E)(implicit dsl: DSLContext): R
 
   def query(implicit dsl: DSLContext) = dsl.select(selectTable.fields() :_*).from(selectTable)
-
+*/
 }
 
 object Constraints {
@@ -56,9 +67,8 @@ object Constraints {
   }
 }
 
-object JooqMapping {
-/*
-  implicit def jooqMapper[T <: TableImpl[R], R <: Record, E]: JooqMapping[R, E] =
+object JooqMacros {
+  implicit def recordMapper[T <: TableImpl[R], R <: Record, E]: JooqMapping[R, E] =
   macro materializeRecordMapperImpl[T, R, E]
 
   def materializeRecordMapperImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context): c.Expr[JooqMapping[R, E]] = {
@@ -113,8 +123,8 @@ object JooqMapping {
                   q"r.$setter((e.$mapKey).map($scalaToRecord).orNull[$recordFieldType])",
                   None)
               } else {
-                ( q"""$mapKey = $recordToScala(org.scalajooq.Constraints.checkNotNull(if(aliased) r.getValue(withAlias(table.$recordMember)) else r.getValue(table.$recordMember), ${recordMember.name.decodedName.toString} + " in record " + ${recordType.typeSymbol.name.decodedName.toString} + "  is null in the database. There is inconsistent"))""",
-                  q"""r.$setter(org.scalajooq.Constraints.checkNotNull($scalaToRecord(e.$mapKey), $fieldName + " in entity " + ${entityType.typeSymbol.name.decodedName.toString} + " must not be null"))""",
+                ( q"""$mapKey = $recordToScala(com.despegar.sem.macros.Constraints.checkNotNull(if(aliased) r.getValue(withAlias(table.$recordMember)) else r.getValue(table.$recordMember), ${recordMember.name.decodedName.toString} + " in record " + ${recordType.typeSymbol.name.decodedName.toString} + "  is null in the database. There is inconsistent"))""",
+                  q"""r.$setter(com.despegar.sem.macros.Constraints.checkNotNull($scalaToRecord(e.$mapKey), $fieldName + " in entity " + ${entityType.typeSymbol.name.decodedName.toString} + " must not be null"))""",
                   None)
               }
             case None =>
@@ -206,7 +216,7 @@ object JooqMapping {
     val joins = embedded.map{ embeddedMapper =>
       val table = embeddedMapper.tpe.decls.find(_.name.decodedName.toString().equals("table")).get
       val selectTable = embeddedMapper.tpe.decls.find(_.name.decodedName.toString().equals("selectTable")).get
-      q"t = $embeddedMapper.$selectTable.join(t).onKey(org.scalajooq.Constraints.getUniqueReferenceTo(table.asInstanceOf[org.jooq.Table[org.jooq.Record]], $embeddedMapper.$table.asInstanceOf[org.jooq.Table[org.jooq.Record]]))"
+      q"t = $embeddedMapper.$selectTable.join(t).onKey(com.despegar.sem.macros.Constraints.getUniqueReferenceTo(table.asInstanceOf[org.jooq.Table[org.jooq.Record]], $embeddedMapper.$table.asInstanceOf[org.jooq.Table[org.jooq.Record]]))"
     }
 
     val tableCompanion = tableType.typeSymbol.companion
@@ -214,22 +224,10 @@ object JooqMapping {
 
 
     c.Expr[JooqMapping[R, E]] { q"""
-      new org.scalajooq.JooqMapping[$recordType, $entityType] {
-        override val table = $tableCompanion.$companionMethod
-        override val selectTable = {
-           var t = table.asInstanceOf[org.jooq.Table[org.jooq.Record]]
-           ..$joins
-           t
-        }
-        override def toEntityAliased(r: org.jooq.Record, aliased: Boolean = true) = $companion(..$toEntityParams)
-        override def toRecord(e: $entityType)(implicit dsl: org.jooq.DSLContext): $recordType = {
-          val r = dsl.newRecord(table)
-          ..$toRecordParams
-          r
-        }
+      new com.scalajooq.JooqMapping[$recordType, $entityType] {
       }
     """
     }
   }
-*/
+
 }
