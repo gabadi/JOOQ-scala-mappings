@@ -4,19 +4,18 @@
     <url>${db.url}</url>
   </jdbc>
 
-
   <generator>
     <name>org.jooq.util.ScalaGenerator</name>
     <database>
-      <name>org.jooq.util.mysql.MySQLDatabase</name>
-      <includes>.*</includes>
+      <name>org.jooq.util.h2.H2Database</name>
+      <!--<schemaVersionProvider>SELECT :schema_name || '_' || MAX("version") FROM "schema_version"</schemaVersionProvider>-->
     </database>
     <generate>
       <records>true</records>
     </generate>
     <target>
       <packageName>db.test</packageName>
-      <directory>target/scala-2.11/jooq/main</directory>
+      <directory>target/scala-2.11/jooq/test</directory>
     </target>
   </generator>
 </configuration>

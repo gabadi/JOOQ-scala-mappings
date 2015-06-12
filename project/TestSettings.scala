@@ -21,12 +21,13 @@ import scala.util.control.NonFatal
 object TestSettings {
 
   object DBTasks {
-    val dbStart = TaskKey[Unit]("dbStart", "Starts the DB.")
+    val dbStart = TaskKey[Seq[File]]("dbStart", "Starts the DB.")
     val dbStop = TaskKey[Unit]("dbStop", "Stop the DB.")
 
     val settings = Seq[Setting[_]](
       compile in Test <<= compile in Test dependsOn dbStart,
       managedSourceDirectories in Test += crossTarget.value / "jooq" / "test",
+      sourceGenerators in Test <+= (dbStart in Test),
       dbStart <<= (managedClasspath in Test, streams, resourceDirectory in Test, crossTarget in Test).map((loader, s, resourceDirectory, ct) => {
         val conf = ConfigFactory.parseFileAnySyntax(new java.io.File(resourceDirectory, "application.conf"))
 
@@ -106,15 +107,15 @@ object TestSettings {
           val jooqConf = filteredJooqConf(new File(resourceDirectory, "jooq.xml"))
 
           jooqConf.getGenerator.getTarget.setDirectory((ct / "jooq" / "test").toString)
-
           GenerationTool.generate(jooqConf)
+          recursiveListFiles(ct / "jooq" / "test").filter(_.isFile)
         }
 
         stopIfRunning
         runDbInFork
         waitTillDbStarted
         migrations
-        runJooqCodeGen
+        runJooqCodeGen()
       }),
       dbStop <<= (fullClasspath in Test).map(loader => {
         val jar = loader.find(_.data.getName.startsWith("h2-")).get.data
