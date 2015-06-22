@@ -8,7 +8,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.reflect.runtime.{universe => ru}
 
-trait JooqMapping[R <: Record, E] extends RecordMapper[Record, E] {
+trait JooqMeta[R <: Record, E] extends RecordMapper[Record, E] {
 
   val table: org.jooq.Table[R]
 
@@ -66,12 +66,12 @@ object Constraints {
   }
 }
 
-object JooqMapping {
-  implicit def recordMapper[T <: TableImpl[R], R <: Record, E]: JooqMapping[R, E] =
+object JooqMeta {
+  implicit def metaOf[T <: TableImpl[R], R <: Record, E]: JooqMeta[R, E] =
   macro materializeRecordMapperImpl[T, R, E]
 
 
-  def materializeRecordMapperImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context): c.Expr[JooqMapping[R, E]] = {
+  def materializeRecordMapperImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context): c.Expr[JooqMeta[R, E]] = {
     import c.universe._
 
     def implicitConversion(from: Type, to: Type) = c.inferImplicitValue(
@@ -236,7 +236,7 @@ object JooqMapping {
     val companionMethod = TermName(LOWER_CAMEL.to(UPPER_UNDERSCORE, tableType.typeSymbol.name.decodedName.toString))
 
     val code = q"""
-      new ${weakTypeOf[JooqMapping[R, E]]} {
+      new ${weakTypeOf[JooqMeta[R, E]]} {
         override val table = $tableCompanion.$companionMethod
         override val selectTable = {
            var t = table.asInstanceOf[${weakTypeOf[Table[Record]]}]
@@ -252,7 +252,7 @@ object JooqMapping {
     """
 
 
-    c.Expr[JooqMapping[R, E]] {
+    c.Expr[JooqMeta[R, E]] {
       code
     }
   }
