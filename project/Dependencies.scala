@@ -9,12 +9,12 @@ object Dependencies {
   lazy val macrosLibraryDependencies = Seq(
     "org.jooq"               %  "jooq"                 % jooqVersion,
     "org.jooq"               %  "jooq-meta"            % jooqVersion,
-    "org.jooq"               %  "jooq-codegen"         % jooqVersion,
     "org.jooq"               %  "jooq-scala"           % jooqVersion,
     "org.scala-lang"         % "scala-reflect"         % scalaV,
     "org.scalatest"         %% "scalatest"             % "2.2.5" % Test,
     "com.h2database"         % "h2"                    % "1.4.187" % Test,
     "com.typesafe"           % "config"                % "1.2.1" % Test,
+    "com.twitter"           %% "util-eval"             % "6.24.0" % Test,
     "com.google.guava"       % "guava"                 % "18.0"
   )
 

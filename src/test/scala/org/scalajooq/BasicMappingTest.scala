@@ -1,0 +1,122 @@
+package org.scalajooq
+
+import db.test.public.tables.records.UserRecord
+import db.test.public.{Tables, tables}
+
+import scala.reflect.runtime.{universe => ru}
+
+
+class UserNoCase(id: Long, firstName: String, lastName: String)
+
+case class UserRecordAbsent(id2: Long, firstName: String, lastName: String)
+
+case class UserDiffType(id: String, firstName: String, lastName: String)
+
+case class UserNoName(id: Long, lastName: String)
+
+case class UserOption(id: Long, firstName: Option[String], lastName: Option[String])
+
+class BasicMappingTest extends BaseSpec {
+
+  "BasicMapping" when {
+    "map record to entity" should {
+      "map record" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        r.setFirstName("name")
+        r.setLastName("last")
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, User]
+        mapper.map(r) shouldBe User(1l, "name", "last")
+      }
+      "record to entity" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        r.setFirstName("name")
+        r.setLastName("last")
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, User]
+        mapper.toEntity(r) shouldBe User(1l, "name", "last")
+      }
+      "record to entity missing field" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        r.setFirstName("name")
+        r.setLastName("last")
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserNoName]
+        mapper.toEntity(r) shouldBe UserNoName(1l, "last")
+      }
+      "record to opt entity present" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        r.setFirstName("name")
+        r.setLastName("last")
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, User]
+        mapper.toOptEntity(r) shouldBe Some(User(1l, "name", "last"))
+      }
+      "record to entity opt field absent" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserOption]
+        mapper.toOptEntity(r) shouldBe Some(UserOption(1, None, None))
+      }
+      "record to entity opt field present" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        r.setId(1l)
+        r.setFirstName("name")
+        r.setLastName("last")
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserOption]
+        mapper.toOptEntity(r) shouldBe Some(UserOption(1, Some("name"), Some("last")))
+      }
+      "record to opt entity absent" in DB.withRollback { dsl =>
+        val r = dsl.newRecord(Tables.USER)
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, User]
+        mapper.toOptEntity(r) shouldBe None
+      }
+    }
+    "map entity to record" should {
+      "map record" in DB.withRollback { implicit dsl =>
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, User]
+        val r = mapper.toRecord(User(1l, "name", "last"))
+        r.getId shouldBe 1l
+        r.getFirstName shouldBe "name"
+        r.getLastName shouldBe "last"
+      }
+      "entity to record missing field" in DB.withRollback { implicit dsl =>
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserNoName]
+        val r = mapper toRecord UserNoName(1l, "last")
+        r.getId shouldBe 1l
+        r.getFirstName shouldBe null
+        r.getLastName shouldBe "last"
+      }
+      "entity to record opt field absent" in DB.withRollback { implicit dsl =>
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserOption]
+        val r = mapper toRecord UserOption(1l, None, None)
+        r.getId shouldBe 1l
+        r.getFirstName shouldBe null
+        r.getLastName shouldBe null
+      }
+      "record to entity opt field present" in DB.withRollback { implicit dsl =>
+        val mapper = JooqMapping.recordMapper[tables.User, UserRecord, UserOption]
+        val r = mapper toRecord UserOption(1, Some("name"), Some("last"))
+        r.getId shouldBe 1l
+        r.getFirstName shouldBe "name"
+        r.getLastName shouldBe "last"
+      }
+    }
+    "fails on" should {
+      "no case class" in DB.withRollback { dsl =>
+        val code = s"org.scalajooq.JooqMapping.recordMapper[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserNoCase]"
+        assertNoCompiles(code, "only map case class")
+      }
+      "different field type" in DB.withRollback { dsl =>
+        val code = s"org.scalajooq.JooqMapping.recordMapper[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserDiffType]"
+        assertNoCompiles(code, "Can not find an implicit conversion between")
+      }
+      "entity field absent in record" in DB.withRollback { dsl =>
+        val code = s"org.scalajooq.JooqMapping.recordMapper[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserRecordAbsent]"
+        assertNoCompiles(code, "ID2 column, but doesn't exists")
+        assertNoCompiles(code, "ID2_ID column is expected")
+      }
+    }
+  }
+
+}

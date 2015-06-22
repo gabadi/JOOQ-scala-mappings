@@ -3,6 +3,7 @@ import java.net.Socket
 
 import com.typesafe.config.ConfigFactory
 import odelay.Timer
+import org.apache.ivy.util.FileUtil
 import org.jooq.util.GenerationTool
 import sbt.Keys._
 import sbt._
@@ -107,6 +108,7 @@ object TestSettings {
           val jooqConf = filteredJooqConf(new File(resourceDirectory, "jooq.xml"))
 
           jooqConf.getGenerator.getTarget.setDirectory((ct / "jooq" / "test").toString)
+          FileUtil.forceDelete(ct / "jooq" / "test")
           GenerationTool.generate(jooqConf)
           recursiveListFiles(ct / "jooq" / "test").filter(_.isFile)
         }

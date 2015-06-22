@@ -1,10 +1,10 @@
-package com.scalajooq
+package org.scalajooq
 
 import com.typesafe.config.ConfigFactory
 import org.h2.jdbcx.JdbcDataSource
-import org.jooq.{Configuration, TransactionalRunnable, DSLContext}
 import org.jooq.impl.{DSL, DataSourceConnectionProvider, DefaultConfiguration}
 import org.jooq.tools.jdbc.JDBCUtils
+import org.jooq.{Configuration, DSLContext, TransactionalRunnable}
 
 import scala.util.control.NonFatal
 
