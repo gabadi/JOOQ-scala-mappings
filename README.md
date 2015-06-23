@@ -50,7 +50,7 @@ That is as simple as doing:
     r setFirstName "name"
     r setLastName "last"
 
-    val meta = org.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
+    val meta = com.github.gabadi.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
     
     val user = meta toEntity r
 
@@ -73,7 +73,7 @@ During compilation you'll see a message like this:
 
 ```
 Mappings error:
- org.scalajooq.User.firsName expects a db.test.public.tables.records.UserRecord.FIRS_NAME column, but doesn't exists
+ com.github.gabadi.scalajooq.User.firsName expects a db.test.public.tables.records.UserRecord.FIRS_NAME column, but doesn't exists
 ```
 
 ### Entity to record mapping
@@ -81,7 +81,7 @@ Now in the other way this is valid too
 ```
     val entity = User(0, "name", "last")
     
-    val meta = org.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
+    val meta = com.github.gabadi.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
     
     val record = meta toRecord entity
     record.store()
@@ -104,7 +104,7 @@ Anyone can make a mapping like this:
     val r = dsl.newRecord(Table<s.USER)
     r setId 1l
 
-    val meta = org.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
+    val meta = com.github.gabadi.scalajooq.JooqMeta.metaOf[tables.User, UserRecord, User]
     
     val user = meta toEntity r
     println(user)

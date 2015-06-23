@@ -1,4 +1,4 @@
-package org.scalajooq
+package com.github.gabadi.scalajooq
 
 import com.typesafe.config.ConfigFactory
 import org.h2.jdbcx.JdbcDataSource

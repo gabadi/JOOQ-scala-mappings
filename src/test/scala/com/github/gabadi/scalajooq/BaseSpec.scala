@@ -1,4 +1,4 @@
-package org.scalajooq
+package com.github.gabadi.scalajooq
 
 import com.twitter.util.Eval
 import org.scalatest.{Inside, Matchers, WordSpec}

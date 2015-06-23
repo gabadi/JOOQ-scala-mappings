@@ -1,6 +1,6 @@
 name := "JOOQ-scala-mappings"
 
-organization := "org.scalajooq"
+organization := "com.github.gabadi.scalajooq"
 
 version := "1.0"
 

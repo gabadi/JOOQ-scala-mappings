@@ -1,4 +1,4 @@
-package org.scalajooq
+package com.github.gabadi.scalajooq
 
 import com.google.common.base.CaseFormat.{LOWER_CAMEL, UPPER_UNDERSCORE}
 import org.jooq.impl.TableImpl
@@ -142,8 +142,8 @@ object JooqMeta {
                 q"r.$recordSetter((e.$fieldTermName).map($e2rTypeConversion).orNull[$recordFieldType])",
                 None)
             } else {
-              ( q"""$fieldTermName = $r2eTypeConversion(org.scalajooq.Constraints.checkNotNull(if(aliased) r.getValue(withAlias(table.$recordMember)) else r.getValue(table.$recordMember), ${recordMember.name.decodedName.toString} + " in record " + ${recordType.typeSymbol.name.decodedName.toString} + "  is null in the database. This is inconsistent"))""",
-                q"""r.$recordSetter(org.scalajooq.Constraints.checkNotNull($e2rTypeConversion(e.$fieldTermName), $fieldName + " in entity " + ${entityType.typeSymbol.name.decodedName.toString} + " must not be null"))""",
+              ( q"""$fieldTermName = $r2eTypeConversion(com.github.gabadi.scalajooq.Constraints.checkNotNull(if(aliased) r.getValue(withAlias(table.$recordMember)) else r.getValue(table.$recordMember), ${recordMember.name.decodedName.toString} + " in record " + ${recordType.typeSymbol.name.decodedName.toString} + "  is null in the database. This is inconsistent"))""",
+                q"""r.$recordSetter(com.github.gabadi.scalajooq.Constraints.checkNotNull($e2rTypeConversion(e.$fieldTermName), $fieldName + " in entity " + ${entityType.typeSymbol.name.decodedName.toString} + " must not be null"))""",
                 None)
             }
           }
@@ -229,7 +229,7 @@ object JooqMeta {
     val joins = embedded.map { embeddedMapper =>
       val table = embeddedMapper.tpe.decls.find(_.name.decodedName.toString().equals("table")).get
       val selectTable = embeddedMapper.tpe.decls.find(_.name.decodedName.toString().equals("selectTable")).get
-      q"t = $embeddedMapper.$selectTable.join(t).onKey(org.scalajooq.Constraints.getUniqueReferenceTo(table.asInstanceOf[org.jooq.Table[org.jooq.Record]], $embeddedMapper.$table.asInstanceOf[org.jooq.Table[org.jooq.Record]]))"
+      q"t = $embeddedMapper.$selectTable.join(t).onKey(com.github.gabadi.scalajooq.Constraints.getUniqueReferenceTo(table.asInstanceOf[org.jooq.Table[org.jooq.Record]], $embeddedMapper.$table.asInstanceOf[org.jooq.Table[org.jooq.Record]]))"
     }*/
 
     val tableCompanion = tableType.typeSymbol.companion

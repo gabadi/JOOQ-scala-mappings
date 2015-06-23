@@ -1,4 +1,4 @@
-package org.scalajooq
+package com.github.gabadi.scalajooq
 
 import db.test.public.tables.records.UserRecord
 import db.test.public.{Tables, tables}
@@ -104,15 +104,15 @@ class BasicMappingTest extends BaseSpec {
     }
     "fails on" should {
       "no case class" in DB.withRollback { dsl =>
-        val code = s"org.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserNoCase]"
+        val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserNoCase]"
         assertNoCompiles(code, "only map case class")
       }
       "different field type" in DB.withRollback { dsl =>
-        val code = s"org.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserDiffType]"
+        val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserDiffType]"
         assertNoCompiles(code, "Can not find an implicit conversion between")
       }
       "entity field absent in record" in DB.withRollback { dsl =>
-        val code = s"org.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, org.scalajooq.UserRecordAbsent]"
+        val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserRecordAbsent]"
         assertNoCompiles(code, "ID2 column, but doesn't exists")
         assertNoCompiles(code, "ID2_ID column is expected")
       }
