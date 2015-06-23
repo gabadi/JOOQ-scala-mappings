@@ -10,6 +10,14 @@ lazy val macros = project.in(file("."))
   .settings(Dependencies.settings : _*)
   .settings(TestSettings.testSettings :_*)
 
+releaseVersionBump := sbtrelease.Version.Bump.Major
+
+//releasePublishArtifactsAction := PgpKeys.publishSigned.value
+
+publishMavenStyle := true
+
+publishArtifact in Test := false
+
 scalacOptions in ThisBuild ++= Seq(
   "-target:jvm-1.7",
   "-encoding", "UTF-8",

@@ -6,6 +6,10 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.4")
 
 resolvers += "softprops-maven" at "http://dl.bintray.com/content/softprops/maven"
 
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.0")
+
+addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
+
 val jooqVersion = "3.6.1"
 
 libraryDependencies ++= Seq(
