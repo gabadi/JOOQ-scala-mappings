@@ -1,7 +1,9 @@
 package com.github.gabadi.scalajooq
 
+import db.test.public.Tables.USER
 import db.test.public.tables.records.UserRecord
 import db.test.public.{Tables, tables}
+import org.jooq.Field
 
 import scala.reflect.runtime.{universe => ru}
 
@@ -19,9 +21,17 @@ case class UserOption(id: Long, firstName: Option[String], lastName: Option[Stri
 class BasicMappingTest extends BaseSpec {
 
   "BasicMapping" when {
+    "fields" should {
+      "support all" in DB.withRollback{ dsl =>
+        JooqMeta.metaOf[tables.User, UserRecord, User].fields should contain theSameElementsAs(USER.ID :: USER.FIRST_NAME :: USER.LAST_NAME :: Nil)
+      }
+      "only have fields presents in the entity" in DB.withRollback{ dsl =>
+        JooqMeta.metaOf[tables.User, UserRecord, UserNoName].fields should contain theSameElementsAs(USER.ID :: USER.LAST_NAME :: Nil)
+      }
+    }
     "map record to entity" should {
       "map record" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         r.setFirstName("name")
         r.setLastName("last")
@@ -29,7 +39,7 @@ class BasicMappingTest extends BaseSpec {
         mapper.map(r) shouldBe User(1l, "name", "last")
       }
       "record to entity" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         r.setFirstName("name")
         r.setLastName("last")
@@ -37,7 +47,7 @@ class BasicMappingTest extends BaseSpec {
         mapper.toEntity(r) shouldBe User(1l, "name", "last")
       }
       "record to entity missing field" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         r.setFirstName("name")
         r.setLastName("last")
@@ -45,7 +55,7 @@ class BasicMappingTest extends BaseSpec {
         mapper.toEntity(r) shouldBe UserNoName(1l, "last")
       }
       "record to opt entity present" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         r.setFirstName("name")
         r.setLastName("last")
@@ -53,13 +63,13 @@ class BasicMappingTest extends BaseSpec {
         mapper.toOptEntity(r) shouldBe Some(User(1l, "name", "last"))
       }
       "record to entity opt field absent" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         val mapper = JooqMeta.metaOf[tables.User, UserRecord, UserOption]
         mapper.toOptEntity(r) shouldBe Some(UserOption(1, None, None))
       }
       "record to entity opt field present" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         r.setId(1l)
         r.setFirstName("name")
         r.setLastName("last")
@@ -67,7 +77,7 @@ class BasicMappingTest extends BaseSpec {
         mapper.toOptEntity(r) shouldBe Some(UserOption(1, Some("name"), Some("last")))
       }
       "record to opt entity absent" in DB.withRollback { dsl =>
-        val r = dsl.newRecord(Tables.USER)
+        val r = dsl.newRecord(USER)
         val mapper = JooqMeta.metaOf[tables.User, UserRecord, User]
         mapper.toOptEntity(r) shouldBe None
       }
