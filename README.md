@@ -5,9 +5,7 @@ All the [JOOQ](http://www.jooq.org) power, in the [scala](http://www.scala-lang.
 ### Why?
 -----------
 
-First of all, i love JOOQ. Is by far the better way to access any SQL DB from the JVM. It's expressive, powerful and it's simply SQL.
-In the other hand, i love scala. It's the most powerful language in the JVM: macros, for comprehension, pattern matching, lambda functions, etc etc (and like uncle ben said: *With great power comes great responsibility*).
-So here i'll put all the scala power to make the life better to all the JOOQ lovers.
+JOOQ is a great tool for accessing a SQL store. It's expressive, powerful, etc. The single thing that i would like to improve is to facilitate the most simple use cases (more or less like an ORM does). And for that this project uses scala macros.
 
 ### Installation
 ------------
