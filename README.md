@@ -19,7 +19,8 @@ TODO: Depends on jooq 3.6.1 or greater with scala codegen
  1. [Record to entities mappings](#record-to-entity-mapping)
  2. [Entity to record mappings](#entity-to-record-mapping)
  3. [Scala option support](#scala-option-support)
- 3. [Implicit type conversion](#implicit-type-conversion)
+ 4. [Implicit type conversion](#implicit-type-conversion)
+ 5. [Embedded entities](#embedded-entities)
 
 More to come...
 
@@ -112,6 +113,7 @@ With this result:
     User(1, None, None)
 ```
 And in the other hand, JOOQ-scala-mappings will never let you have an Entity with a null field. Instead of that, an exception will be thrown when you try to generate that entity.
+
 ###Implicit type conversion
 The current user as we have defined it, has a little issue. If you see the id field, you'll see that it's not a scala Long, it's a java Long.
 So, what if you want a standard scala **Long**?, or **Int**? or **Boolean**?
@@ -129,12 +131,62 @@ case class User2(id: Long,
 
 ```
 
+###Embedded entities
+What if i want to represent a complex entity, with some other embedded entity inside.
+Something like this:
+
+```
+case class Name(first: String, last: String)
+
+case class Profile(name: Name)
+
+case class FullUser(id: Long, profile: Profile)
+```
+
+This can be automatically mapped to a table like this:
+```
+CREATE TABLE `full_user` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `profile_name_first` varchar(50),
+  `profile_name_last` varchar(50),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+Where we can see that the **FullUser** has an **Id** and we can call the **Profile** an embedded entity inside the **FullUser**, and the **Name** inside the **Profile** may be another embedded entity. <br/>
+And that hierarchy can be mapped with something like this:
+```
+ val nameMeta = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Name]("profileName")
+ val profileMeta = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Profile]("profile")
+ val userMeta = JooqMeta.metaOf[tables.FullUser, FullUserRecord, FullUser]
+```
+Where the **namespacedMetaOf** does the magic
+But if this seams to be too match work, we can simple do:
+```
+ val userMeta = JooqMeta.metaOf[tables.FullUser, FullUserRecord, FullUser]
+```
+And with only that, all the other macros will be auto generated.
+
+
 ###Next functionalities
 --------
 
  1. base DAOs
- 2. Embedded entities
- 3. Joined entities
+ 2. Joined entities
+ 3. One to many functionality
+ 4. Many to many functionality
+ 5. Basic query generator
+
+###Limitations
+------------
+
+ 1. Does not support a two way relation. Something like this:
+```
+case class Profile(firstName: String, lastName: String)
+
+case class User(id: Long, profile: Profile)
+```
+In this case, the **User** knowns the **Profile**. And the **Profile** knowns the **User**. So the macro can never be resolved.
+ 
 
 ###Contributing
 ------------

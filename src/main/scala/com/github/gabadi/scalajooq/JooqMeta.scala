@@ -16,9 +16,9 @@ trait JooqMeta[R <: Record, E] extends RecordMapper[Record, E] {
 
   val selectTable: org.jooq.Table[Record]
 
-  def fields = selectTable.fields()
+  lazy val fields = selectTable.fields()
 
-  val aliasedFields = fields.map(f => withAlias(f))
+  lazy val aliasedFields = fields.map(f => withAlias(f))
 
   def withAlias[T](field: org.jooq.Field[T]): org.jooq.Field[T] = field.as(field.toString)
 
@@ -127,7 +127,7 @@ object JooqMeta {
 
     val packag = q"com.github.gabadi.scalajooq"
     val jooqMeta = q"$packag.JooqMeta"
-    val checkNotNull = q"$packag.Constraints.checkNotNull"
+    def checkNotNullTree(tree: Tree, message: String) = q"$packag.Constraints.checkNotNull($tree, $message)"
 
 
     val tableType = weakTypeOf[T]
@@ -166,11 +166,13 @@ object JooqMeta {
                 q"r.$recordSetter(e.$fieldTermName.map($e2rTypeConversion).orNull[$recordFieldType])",
                 q"f = f ++ Array($table.$recordMember)")
             } else {
-              val nullInRecordMessage = q"""${recordMember.name.decodedName.toString} + " in record " + ${recordType.typeSymbol.name.decodedName.toString} + "  is null in the database. This is inconsistent""""
-              val nullInEntityMessage = q"""$fieldName + " in entity " + ${entityType.typeSymbol.name.decodedName.toString} + " must not be null""""
-              (q"$fieldTermName = $r2eTypeConversion($checkNotNull($getMaybeAliasedValue, $nullInRecordMessage))",
-                q"r.$recordSetter($checkNotNull($e2rTypeConversion(e.$fieldTermName), $nullInEntityMessage))",
+              val nullInRecordMessage = s"${recordMember.name.decodedName.toString} in record ${recordType.typeSymbol.name.decodedName.toString} is null in the database. This is inconsistent"
+              val nullInEntityMessage = s"$fieldName in entity ${entityType.typeSymbol.name.decodedName.toString} must not be null"
+              val entityFieldConverted = q"$e2rTypeConversion(e.$fieldTermName)"
+              (q"$fieldTermName = $r2eTypeConversion(${checkNotNullTree(getMaybeAliasedValue, nullInRecordMessage)})",
+                q"r.$recordSetter(${checkNotNullTree(entityFieldConverted, nullInEntityMessage)})",
                 q"f = f ++ Array($table.$recordMember)")
+
             }
           }
         case None =>
@@ -295,13 +297,13 @@ object JooqMeta {
            var t = table.asInstanceOf[${weakTypeOf[Table[Record]]}]
            t
         }
-        override def fields = {
+        override lazy val fields = {
           var f = Array.empty[${weakTypeOf[Field[_]]}]
           ..$mappedFields
           f
         }
         override def toEntityAliased(r: ${weakTypeOf[Record]}, aliased: Boolean = true) = $companion(..$toEntityParams)
-        override def toRecord(e: $entityType, current: $recordType = null.asInstanceOf[$recordType])(implicit dsl: org.jooq.DSLContext): $recordType = {
+        override def toRecord(e: $entityType, current: $recordType = null.asInstanceOf[$recordType])(implicit dsl: ${weakTypeOf[DSLContext]}): $recordType = {
           val r = if(current != null) current else dsl.newRecord(table)
           ..$toRecordParams
           r
