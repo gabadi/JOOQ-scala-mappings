@@ -1,11 +1,8 @@
 package com.github.gabadi.scalajooq
 
 import db.test.public.Tables.USER
+import db.test.public.tables
 import db.test.public.tables.records.UserRecord
-import db.test.public.{Tables, tables}
-import org.jooq.Field
-
-import scala.reflect.runtime.{universe => ru}
 
 
 class UserNoCase(id: Long, firstName: String, lastName: String)
@@ -22,11 +19,11 @@ class BasicMappingTest extends BaseSpec {
 
   "BasicMapping" when {
     "fields" should {
-      "support all" in DB.withRollback{ dsl =>
-        JooqMeta.metaOf[tables.User, UserRecord, User].fields should contain theSameElementsAs(USER.ID :: USER.FIRST_NAME :: USER.LAST_NAME :: Nil)
+      "support all" in DB.withRollback { dsl =>
+        JooqMeta.metaOf[tables.User, UserRecord, User].fields should contain theSameElementsAs (USER.ID :: USER.FIRST_NAME :: USER.LAST_NAME :: Nil)
       }
-      "only have fields presents in the entity" in DB.withRollback{ dsl =>
-        JooqMeta.metaOf[tables.User, UserRecord, UserNoName].fields should contain theSameElementsAs(USER.ID :: USER.LAST_NAME :: Nil)
+      "only have fields presents in the entity" in DB.withRollback { dsl =>
+        JooqMeta.metaOf[tables.User, UserRecord, UserNoName].fields should contain theSameElementsAs (USER.ID :: USER.LAST_NAME :: Nil)
       }
     }
     "map record to entity" should {

@@ -1,10 +1,8 @@
 package com.github.gabadi.scalajooq
 
 import db.test.public.Tables.FULL_USER
-import db.test.public.tables.records.{FullUserRecord, UserWithAddressRecord, UserRecord}
+import db.test.public.tables.records.{FullUserRecord, UserWithAddressRecord}
 import db.test.public.{Tables, tables}
-
-import scala.reflect.runtime.{universe => ru}
 
 class NoCaseProfile(name: Name)
 
