@@ -1,3 +1,5 @@
+import ReleaseTransformations._
+
 name := "JOOQ-scala-mappings"
 
 organization := "com.github.gabadi.scalajooq"
@@ -29,4 +31,19 @@ scalacOptions in ThisBuild ++= Seq(
   "-Ywarn-value-discard", // Warn when non-Unit expression results are unused
   "-Ywarn-inaccessible",
   "-Ywarn-dead-code"
+)
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  ReleaseStep(action = Command.process("publishSigned", _)),
+  setNextVersion,
+  commitNextVersion,
+  ReleaseStep(action = Command.process("sonatypeReleaseAll", _)),
+  pushChanges
 )
