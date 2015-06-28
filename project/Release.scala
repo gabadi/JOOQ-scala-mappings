@@ -1,49 +1,50 @@
 import sbt.Keys._
 import sbt._
+import sbtrelease.ReleasePlugin
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport._
 
 object Release {
-  /*
-publishTo <<= (version in ThisBuild) {
-  v: String =>
-    val nexus = "http://nexus.despegar.it:8080/nexus/content/repositories/"
-    if (v.trim.endsWith("SNAPSHOT"))
-      Some("Despegar Snapshots" at nexus + "snapshots/")
-    else
-      Some("Despegar Releases" at nexus + "releases/")
-}
-*/
-/*
-  lazy val distHack = TaskKey[File]("dist-hack", "Hack to publish dist")
 
-  lazy val releaseSettings = ReleasePlugin.releaseSettings ++ Seq(
-    publishTo <<= (version in ThisBuild) {
-      v: String =>
-        val nexus = "http://nexus.despegar.it:8080/nexus/content/repositories/"
-        if (v.trim.endsWith("SNAPSHOT"))
-          Some("Despegar Snapshots" at nexus + "snapshots/")
-        else
-          Some("Despegar Releases" at nexus + "releases/")
-    },
-    distHack <<= (target in SbtNativePackager.Universal, universal.Keys.name in SbtNativePackager.Universal) map { (d, n) => d / (n + ".zip")},
-    ReleaseKeys.versionBump := Version.Bump.Bugfix,
-    publish <<= publish dependsOn universal.Keys.dist,
-    publishLocal <<= publishLocal dependsOn universal.Keys.dist,
-    artifact in distHack <<= moduleName(n => Artifact(n, "zip", "zip")),
-    publishMavenStyle in publish := true,
-    publishMavenStyle in publishLocal := true,
-    ReleaseKeys.releaseProcess := Seq[ReleaseStep](
+  lazy val releaseSettings = ReleasePlugin.projectSettings ++ Seq(
+    releaseVersionBump := sbtrelease.Version.Bump.Bugfix,
+    publishMavenStyle := true,
+    publishArtifact in Test := false,
+    releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
-      setReleaseVersion,
-      //runClean, // if descomented npm fails
+      runClean,
       runTest,
+      setReleaseVersion,
       commitReleaseVersion,
       tagRelease,
-      publishArtifacts,
+      ReleaseStep(action = Command.process("publishSigned", _)),
       setNextVersion,
       commitNextVersion,
-      pushChanges)
-  ) ++ Seq(addArtifact(artifact in distHack, distHack).settings: _*)
+      ReleaseStep(action = Command.process("sonatypeReleaseAll", _)),
+      pushChanges
+    ),
+    pomExtra in Global := {
+      <url>(your project URL)</url>
+        <licenses>
+          <license>
+            <name>Apache 2</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+          </license>
+        </licenses>
+        <scm>
+          <connection>scm:git:github.com/gabadi/JOOQ-scala-mappings</connection>
+          <developerConnection>scm:git:git@github.com:gabadi/JOOQ-scala-mappings</developerConnection>
+          <url>github.com/gabadi/JOOQ-scala-mappings</url>
+        </scm>
+        <developers>
+          <developer>
+            <id>1</id>
+            <name>gabriel.d.abadi@gmail.com</name>
+            <url>https://github.com/gabadi</url>
+          </developer>
+        </developers>
+    }
+  )
 
-*/
 }
