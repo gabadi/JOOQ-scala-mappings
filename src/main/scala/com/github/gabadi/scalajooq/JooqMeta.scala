@@ -175,7 +175,7 @@ object JooqMeta {
       val fieldIsOption = field.typeSignature <:< typeOf[Option[_]]
       val effectiveFieldType = if (fieldIsOption) field.typeSignature.typeArgs.head else field.typeSignature
       tableMembers.get(fieldName) match {
-        // one to one entity - record matching
+        // direct matching between record and entity
         case Some(recordMember) =>
           val recordSetter = recordMembers.get(s"set${namespace.capitalize}${fieldName.capitalize}").get
 
@@ -205,13 +205,16 @@ object JooqMeta {
             }
           }
         case None =>
+          // there is no matching between record and entity
           val implicitMapper = {
             val expectedImplicitMapperType = appliedType(typeOf[RecordMapper[_, _]].typeConstructor, typeOf[Record], effectiveFieldType)
             val implicitMapper = c.inferImplicitValue(expectedImplicitMapperType)
+            // exists an implicit JooqMeta
             if (!implicitMapper.equalsStructure(EmptyTree)) {
               assertIsJooqMeta(implicitMapper)
               implicitMapper
             } else {
+              // try to resolve like an embedded entity
               val newNamespace = s"$namespace${if (namespace.isEmpty) fieldName else fieldName.capitalize}"
               val newNamespaceUpper = LOWER_CAMEL.to(UPPER_UNDERSCORE, newNamespace)
               val mayExistNamespace = tableType.members.exists(_.name.decodedName.toString.startsWith(newNamespaceUpper))
@@ -235,6 +238,7 @@ object JooqMeta {
 
           val toEntity = if (fieldIsOption) q"$implicitMapper.${TermName("toOptEntityAliased")}" else q"$implicitMapper.${TermName("toEntityAliased")}"
 
+          // is an embedded entity
           if (mapperRecordType.equals(recordType)) {
             val toRecord = q"$implicitMapper.${TermName("toRecord")}"
 
@@ -247,14 +251,27 @@ object JooqMeta {
               q"f = f ++ $implicitMapper.${TermName("fields")}",
               Nil)
           } else {
+            // try to resolve like a joined entity
             val idSuffix = {
               val joinedTableType = implicitMapper.tpe.typeArgs.head
-              if (tableMembers.get(s"${fieldName}Id").isDefined && joinedTableType.member(TermName("ID")).isTerm) {
-                "id"
-              } else if (tableMembers.get(s"${fieldName}Oid").isDefined && joinedTableType.member(TermName("OID")).isTerm) {
-                "oid"
-              } else {
+              val maybeMappedMethods = tableMembers.keySet.filter(f => f.startsWith(fieldName))
+              if (maybeMappedMethods.isEmpty) {
                 canNotFindMapIdFieldBetween(joinedTableType, s"$recordType.$fieldName")
+              } else if (maybeMappedMethods.size == 1) {
+                val suffix = maybeMappedMethods.head.replaceFirst(fieldName, "")
+                s"${suffix.substring(0, 0).toLowerCase}${suffix.substring(1, suffix.length)}"
+              } else {
+                if (maybeMappedMethods.exists(_.equals(fieldName + "Id"))) {
+                  "id"
+                } else if (maybeMappedMethods.exists(_.equals(fieldName + "Oid"))) {
+                  "oid"
+                } else if (maybeMappedMethods.exists(_.equals(fieldName + "Code"))) {
+                  "code"
+                } else {
+                  // improve message
+                  canNotFindMapIdFieldBetween(joinedTableType, s"$recordType.$fieldName")
+                }
+
               }
             }
             val tableFieldName = LOWER_CAMEL.to(UPPER_UNDERSCORE, s"$fieldName${idSuffix.capitalize}")
