@@ -7,7 +7,7 @@ import _root_.scala.collection.JavaConverters._
 import _root_.scala.language.implicitConversions
 
 
-abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: JooqMeta[Rec, Entity]) {
+abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: JooqMeta[_ <: Table[Rec], Rec, Entity]) {
 
   require(meta.table.getPrimaryKey != null, s"The table ${meta.table} must have a primary key to be compatible with the JooqDAO")
 
@@ -24,7 +24,7 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
       Some(primaryKeys.head.asInstanceOf[TableField[Rec, ID]])
     else None
   }
-  lazy val createFields = if (primaryKey.isDefined) meta.fields.filterNot(f => primaryKeys.contains(f)) else meta.fields
+  lazy val createFields = (if (primaryKey.isDefined) meta.fields.filterNot(f => primaryKeys.contains(f)) else meta.fields).filter(f => meta.table.fields.exists(_.equals(f)))
   lazy val updateFields = createFields.filterNot(f => immutableFields.contains(f)).filterNot(f => primaryKeys.contains(f))
 
   def findAll(implicit dsl: DSLContext): List[Entity] = List() ++ meta.query(dsl).fetch(meta).asScala
@@ -33,10 +33,29 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
 
   def insertAll(e: Seq[Entity])(implicit dsl: DSLContext): Unit = e.foreach(insert)
 
-  def insert(e: Entity)(implicit dsl: DSLContext): Entity = {
+  def insert(e: Entity)(implicit dsl: DSLContext): ID = {
     val r = attached(e)(dsl)
     r.store(createFields: _*)
-    detached(r)
+    if (primaryKey.isDefined) {
+      r.getValue(primaryKey.get)
+    } else {
+      compositeKeyRecord(primaryKeys.map(f => r.getValue(f)))
+    }
+  }
+
+  protected def compositeKeyRecord(values: AnyRef*)(implicit dsl: DSLContext): ID = {
+    val key = table.getPrimaryKey
+    if (key == null) {
+      throw new RuntimeException(s"table: $table does not has a defined primary key")
+    }
+    val fields = key.getFieldsArray.asInstanceOf[Array[Field[_]]]
+    val result: Record = dsl.newRecord(fields: _*)
+    var i = 0
+    while (i < values.length) {
+      result.setValue(fields(i).asInstanceOf[Field[Any]], fields(i).getDataType.convert(values(i)))
+      i = i + 1
+    }
+    result.asInstanceOf[ID]
   }
 
   implicit def detached(r: Rec): Entity = unsafeDetached(r)
@@ -61,8 +80,6 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
 
   def deleteById(id: ID)(implicit dsl: DSLContext): Int = deleteByIds(id :: Nil)
 
-  def deleteById(id: ID, idn: ID*)(implicit dsl: DSLContext): Int = deleteByIds(idn :+ id)
-
   def deleteByIds(ids: Seq[ID])(implicit dsl: DSLContext): Int = {
     if (primaryKey.isDefined) {
       (dsl.
@@ -84,9 +101,9 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
     }
   }
 
-  def findById(id: ID)(implicit dsl: DSLContext): Option[Entity] = findByIds(id :: Nil).headOption
+  def deleteById(id: ID, idn: ID*)(implicit dsl: DSLContext): Int = deleteByIds(idn :+ id)
 
-  def findByIds(id: ID, idn: ID*)(implicit dsl: DSLContext): List[Entity] = findByIds(idn :+ id)
+  def findById(id: ID)(implicit dsl: DSLContext): Option[Entity] = findByIds(id :: Nil).headOption
 
   def findByIds(ids: Seq[ID])(implicit dsl: DSLContext): List[Entity] = {
     List() ++ (
@@ -102,20 +119,7 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
       )
   }
 
-  protected def compositeKeyRecord(values: AnyRef*)(implicit dsl: DSLContext): ID = {
-    val key = table.getPrimaryKey
-    if (key == null) {
-      throw new RuntimeException(s"table: $table does not has a defined primary key")
-    }
-    val fields = key.getFieldsArray.asInstanceOf[Array[Field[_]]]
-    val result: Record = dsl.newRecord(fields: _*)
-    var i = 0
-    while (i < values.length) {
-      result.setValue(fields(i).asInstanceOf[Field[Any]], fields(i).getDataType.convert(values(i)))
-      i = i + 1
-    }
-    result.asInstanceOf[ID]
-  }
+  def findByIds(id: ID, idn: ID*)(implicit dsl: DSLContext): List[Entity] = findByIds(idn :+ id)
 }
 
 

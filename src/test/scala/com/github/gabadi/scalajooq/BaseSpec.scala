@@ -8,7 +8,7 @@ trait BaseSpec extends WordSpec with Inside with Matchers {
   def assertNoCompiles(code: String, message: String*) = {
     val e = the [Exception] thrownBy new Eval().check(code)
     e.getMessage should not include "ScalaReflectionException"
-    message.foreach(m => e.getMessage should include (m))
+    message.foreach(m => e.getMessage.toLowerCase should include(m.toLowerCase))
   }
 
 

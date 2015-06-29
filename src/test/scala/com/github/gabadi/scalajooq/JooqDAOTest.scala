@@ -3,6 +3,7 @@ package com.github.gabadi.scalajooq
 import db.test.public.Tables.USER
 import db.test.public.tables
 import db.test.public.tables.records.UserRecord
+import org.jooq.DSLContext
 import org.jooq.scala.Conversions._
 
 class JooqDAOTest extends BaseSpec {
@@ -11,21 +12,25 @@ class JooqDAOTest extends BaseSpec {
 
   lazy val userDAO = new DefaultJooqDAO[UserRecord, User]() {}
 
+  def insert(user: User)(implicit dsl: DSLContext) = {
+    val id = userDAO.insert(user)
+    user.copy(id = id)
+  }
+
   "JooqDAO" when {
     "insert" should {
-      "return entity with generated id" in DB.withRollback { implicit dsl =>
+      "returns the generated id" in DB.withRollback { implicit dsl =>
         val toPersist = User(0l, "name", "last")
-        val newUser = userDAO.insert(toPersist)
-        newUser.id should be > 0l
-        newUser shouldBe toPersist.copy(id = newUser.id)
+        val id = userDAO.insert(toPersist)
+        id should be > 0l
       }
       "persist" in DB.withRollback { implicit dsl =>
         val toPersist = User(0l, "name", "last")
-        val newUser = userDAO.insert(toPersist)
+        val id = userDAO.insert(toPersist)
         val r = dsl.selectFrom(USER).fetchOne()
-        r.getId shouldBe newUser.id
-        r.getFirstName shouldBe newUser.firstName
-        r.getLastName shouldBe newUser.lastName
+        r.getId shouldBe id
+        r.getFirstName shouldBe toPersist.firstName
+        r.getLastName shouldBe toPersist.lastName
       }
       "persist vararg" in DB.withRollback { implicit dsl =>
         userDAO.insert(User(0, "name1", "last1"), User(0, "name2", "last2"))
@@ -42,9 +47,9 @@ class JooqDAOTest extends BaseSpec {
         userDAO.findAll should be('empty)
       }
       "retrieve" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         userDAO.findAll should contain theSameElementsAs u1 :: u2 :: u3 :: Nil
       }
@@ -64,18 +69,20 @@ class JooqDAOTest extends BaseSpec {
 
     "update" should {
       "return 1 if entity updated" in DB.withRollback { implicit dsl =>
-        val newUser = userDAO.insert(User(0l, "name", "last"))
-        val affected = userDAO.update(newUser.copy(lastName = "last2"))
+        val user = User(0l, "name", "last")
+        val id = userDAO.insert(user)
+        val affected = userDAO.update(user.copy(lastName = "last2", id = id))
         affected shouldBe 1
       }
       "return 1 if entity not updated" in DB.withRollback { implicit dsl =>
-        val newUser = userDAO.insert(User(0l, "name", "last"))
-        val affected = userDAO.update(newUser)
+        val user = insert(User(0l, "name", "last"))
+        val affected = userDAO.update(user)
         affected shouldBe 1
       }
       "update entity values" in DB.withRollback { implicit dsl =>
-        val newUser = userDAO.insert(User(0l, "name", "last"))
-        val userCopy = newUser.copy(lastName = "last2")
+        val user = User(0l, "name", "last")
+        val id = userDAO.insert(user)
+        val userCopy = user.copy(lastName = "last2", id = id)
         userDAO.update(userCopy)
         dsl.selectFrom(USER).fetchOne(userMeta) shouldBe userCopy
       }
@@ -85,8 +92,8 @@ class JooqDAOTest extends BaseSpec {
         dsl.selectCount().from(USER).fetchOne().value1() shouldBe 0
       }
       "var args return affected and update entities" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
         val u3 = User(0, "name3", "last3")
         val u2Copy = u2.copy(firstName = "nameCopy")
 
@@ -98,8 +105,8 @@ class JooqDAOTest extends BaseSpec {
 
     "updateAll" should {
       "return affected and update entities" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
         val u3 = User(0, "name3", "last3")
         val u2Copy = u2.copy(firstName = "nameCopy")
 
@@ -111,8 +118,8 @@ class JooqDAOTest extends BaseSpec {
 
     "findById" should {
       "retrieve matching entities" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
 
         userDAO.findById(u1.id) shouldBe Some(u1)
         userDAO.findById(u2.id) shouldBe Some(u2)
@@ -120,8 +127,8 @@ class JooqDAOTest extends BaseSpec {
       }
 
       "retrieve matching entities varargs" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
 
         userDAO.findByIds(u1.id :: u2.id :: u2.id + 1 :: Nil) should contain theSameElementsAs u1 :: u2 :: Nil
       }
@@ -129,15 +136,15 @@ class JooqDAOTest extends BaseSpec {
 
     "findByIds" should {
       "retrieve matching entities varargs" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
 
         userDAO.findByIds(u1.id, u2.id, u2.id + 1) should contain theSameElementsAs u1 :: u2 :: Nil
       }
 
       "retrieve matching entities list" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
 
         userDAO.findByIds(u1.id :: u2.id :: u2.id + 1 :: Nil) should contain theSameElementsAs u1 :: u2 :: Nil
       }
@@ -145,24 +152,24 @@ class JooqDAOTest extends BaseSpec {
 
     "delete" should {
       "ignore not exists entity" in DB.withRollback { implicit dsl =>
-        val u = userDAO.insert(User(0, "name1", "last1"))
+        val u = insert(User(0, "name1", "last1"))
         val affected = userDAO.delete(u.copy(id = u.id + 1))
         affected shouldBe 0
         userDAO.findAll should contain theSameElementsAs u :: Nil
       }
       "delete entity" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         userDAO.delete(u1)
         userDAO.findAll should contain theSameElementsAs u2 :: u3 :: Nil
       }
 
       "delete entities varargs" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         val affected = userDAO.delete(u1, u2, u3.copy(id = u3.id + 1))
         affected shouldBe 2
@@ -172,9 +179,9 @@ class JooqDAOTest extends BaseSpec {
 
     "deleteAll" should {
       "delete entities list" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         val affected = userDAO.deleteAll(u1 :: u2 :: u3.copy(id = u3.id + 1) :: Nil)
         affected shouldBe 2
@@ -182,9 +189,9 @@ class JooqDAOTest extends BaseSpec {
       }
 
       "delete whole table" in DB.withRollback { implicit dsl =>
-        userDAO.insert(User(0, "name1", "last1"))
-        userDAO.insert(User(0, "name2", "last2"))
-        userDAO.insert(User(0, "name3", "last3"))
+        insert(User(0, "name1", "last1"))
+        insert(User(0, "name2", "last2"))
+        insert(User(0, "name3", "last3"))
 
         val affected = userDAO.deleteAll
         affected shouldBe 3
@@ -194,24 +201,24 @@ class JooqDAOTest extends BaseSpec {
 
     "deleteById" should {
       "ignore not existing entity" in DB.withRollback { implicit dsl =>
-        val u = userDAO.insert(User(0, "name1", "last1"))
+        val u = insert(User(0, "name1", "last1"))
         val affected = userDAO.deleteById(u.id + 1)
         affected shouldBe 0
         userDAO.findAll should contain theSameElementsAs u :: Nil
       }
       "delete entity" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         userDAO.deleteById(u1.id)
         userDAO.findAll should contain theSameElementsAs u2 :: u3 :: Nil
       }
 
       "delete entities varargs" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         val affected = userDAO.deleteById(u1.id, u2.id, u3.id + 1)
         affected shouldBe 2
@@ -221,9 +228,9 @@ class JooqDAOTest extends BaseSpec {
 
     "deleteByIds" should {
       "delete entities list" in DB.withRollback { implicit dsl =>
-        val u1 = userDAO.insert(User(0, "name1", "last1"))
-        val u2 = userDAO.insert(User(0, "name2", "last2"))
-        val u3 = userDAO.insert(User(0, "name3", "last3"))
+        val u1 = insert(User(0, "name1", "last1"))
+        val u2 = insert(User(0, "name2", "last2"))
+        val u3 = insert(User(0, "name3", "last3"))
 
         val affected = userDAO.deleteByIds(u1.id :: u2.id :: u3.id + 1 :: Nil)
         affected shouldBe 2

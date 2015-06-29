@@ -116,7 +116,7 @@ class BasicMappingTest extends BaseSpec {
       }
       "different field type" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserDiffType]"
-        assertNoCompiles(code, "Can not find an implicit conversion between")
+        assertNoCompiles(code, "can not find an implicit conversion from")
       }
       "entity field absent in record" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserRecordAbsent]"
