@@ -289,9 +289,9 @@ case class Country(id: Long, name: String)
 
 ...
 
-        implicit lazy val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
-        implicit lazy val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
-        implicit lazy val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
+implicit lazy val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
+implicit lazy val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
+implicit lazy val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
 ```
 This **JooqMetas** may be used with the **JooqDAOs**, or simply doing:
 ```
