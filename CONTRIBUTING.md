@@ -1,13 +1,12 @@
 ### Tests
 
-All commits that fix bugs or add features need a test.
+Every commit that solves a bug or adds new features needs a test.
 
 `<blink>` Do not merge code without tests.`</blink>`
 
 ### Docs
 
-Please update the docs with any API changes, the code and docs should
-always be in sync.
+If you make any change to the API, please change the docs to keep it on sync!
 
 ### Development
 
