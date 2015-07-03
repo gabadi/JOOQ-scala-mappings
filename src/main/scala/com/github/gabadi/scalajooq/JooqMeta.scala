@@ -117,7 +117,6 @@ object JooqMeta {
         s"""
            |Mappings error:
            |$entity expects a $record column, but doesn't exists
-                                       |if this is a one to one relation a ${record}_ID column is expected
              """.stripMargin)
     }
 
@@ -226,7 +225,7 @@ object JooqMeta {
               val mayExistNamespace = tableType.members.exists(_.name.decodedName.toString.startsWith(newNamespaceUpper))
 
               if (!mayExistNamespace) {
-                abortFieldNotFoundInRecord(s"$entityType.$fieldName", s"$recordType.$columnName")
+                abortFieldNotFoundInRecord(s"$entityType.$fieldName", s"$recordType.$newNamespaceUpper")
               } else {
                 val tree = q"""$jooqMeta.namespacedMetaOf[$tableType, $recordType, $effectiveFieldType]($newNamespace)"""
                 try {
@@ -262,7 +261,7 @@ object JooqMeta {
               val joinedTableType = implicitMapper.tpe.typeArgs.head
               val maybeMappedMethods = tableMembers.keySet.filter(f => f.startsWith(fieldName))
               if (maybeMappedMethods.isEmpty) {
-                canNotFindMapIdFieldBetween(joinedTableType, s"$recordType.$fieldName")
+                canNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")
               } else if (maybeMappedMethods.size == 1) {
                 val suffix = maybeMappedMethods.head.replaceFirst(fieldName, "")
                 s"${suffix.substring(0, 0).toLowerCase}${suffix.substring(1, suffix.length)}"
@@ -275,7 +274,7 @@ object JooqMeta {
                   "code"
                 } else {
                   // improve message
-                  canNotFindMapIdFieldBetween(joinedTableType, s"$recordType.$fieldName")
+                  canNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")
                 }
 
               }

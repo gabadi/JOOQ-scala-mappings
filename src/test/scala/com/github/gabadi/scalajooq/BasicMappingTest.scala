@@ -121,7 +121,6 @@ class BasicMappingTest extends BaseSpec {
       "entity field absent in record" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.User, db.test.public.tables.records.UserRecord, com.github.gabadi.scalajooq.UserRecordAbsent]"
         assertNoCompiles(code, "ID2 column, but doesn't exists")
-        assertNoCompiles(code, "ID2_ID column is expected")
       }
     }
   }

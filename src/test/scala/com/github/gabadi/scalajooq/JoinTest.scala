@@ -1,8 +1,9 @@
 package com.github.gabadi.scalajooq
 
+import com.github.gabadi.scalajooq.JooqMeta.metaOf
 import db.test.public.Tables.{CITY, COUNTRY, STATE}
 import db.test.public.tables
-import db.test.public.tables.records.{CityRecord, CountryRecord, StateRecord}
+import db.test.public.tables.records._
 import org.jooq.DSLContext
 
 case class City(id: Long, name: String, state: State)
@@ -13,22 +14,26 @@ case class State(id: Long, name: String, country: Country)
 
 case class Country(id: Long, name: String)
 
+case class CityCode(code: String, name: String, state: StateCode)
+
+case class StateCode(code: String, name: String)
+
 class JoinTest extends BaseSpec {
 
   "Join" when {
     "selectTable" should {
       "has the correct inner join" in DB.withRollback { dsl =>
-        implicit lazy val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
-        implicit lazy val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
-        implicit lazy val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
+        implicit lazy val countryMeta = metaOf[tables.Country, CountryRecord, Country]
+        implicit lazy val stateMeta = metaOf[tables.State, StateRecord, State]
+        implicit lazy val cityMeta = metaOf[tables.City, CityRecord, City]
 
         cityMeta.selectTable.toString shouldBe (CITY join STATE).on(CITY.STATE_ID equal STATE.ID).join(COUNTRY).on(STATE.COUNTRY_ID equal COUNTRY.ID).toString
       }
 
       "has the correct outer join" in DB.withRollback { dsl =>
-        implicit lazy val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
-        implicit lazy val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
-        implicit lazy val cityOptMeta = JooqMeta.metaOf[tables.City, CityRecord, CityOptState]
+        implicit lazy val countryMeta = metaOf[tables.Country, CountryRecord, Country]
+        implicit lazy val stateMeta = metaOf[tables.State, StateRecord, State]
+        implicit lazy val cityOptMeta = metaOf[tables.City, CityRecord, CityOptState]
 
         cityOptMeta.selectTable.toString shouldBe (CITY leftOuterJoin STATE).on(CITY.STATE_ID equal STATE.ID).leftOuterJoin(COUNTRY).on(STATE.COUNTRY_ID equal COUNTRY.ID).toString
       }
@@ -61,10 +66,10 @@ class JoinTest extends BaseSpec {
     }
 
     lazy val joinDAOs = {
-      implicit val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
-      implicit val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
-      implicit val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
-      implicit val cityOptStateMeta = JooqMeta.metaOf[tables.City, CityRecord, CityOptState]
+      implicit val countryMeta = metaOf[tables.Country, CountryRecord, Country]
+      implicit val stateMeta = metaOf[tables.State, StateRecord, State]
+      implicit val cityMeta = metaOf[tables.City, CityRecord, City]
+      implicit val cityOptStateMeta = metaOf[tables.City, CityRecord, CityOptState]
 
       val countryDAO = new DefaultJooqDAO[CountryRecord, Country]() {}
       val stateDAO = new DefaultJooqDAO[StateRecord, State]() {}
@@ -120,6 +125,19 @@ class JoinTest extends BaseSpec {
         co.name shouldBe "c"
       }
     }
-  }
 
+    "string id" should {
+      "manages inner join relations" in DB.withRollback { implicit dsl =>
+        implicit val stateMeta = metaOf[tables.StateCode, StateCodeRecord, StateCode]
+        implicit val cityMeta = metaOf[tables.CityCode, CityCodeRecord, CityCode]
+        val stateDAO = new GenericJooqDAO[StateCodeRecord, String, StateCode]() {}
+        val cityDAO = new GenericJooqDAO[CityCodeRecord, String, CityCode]() {}
+        val sCode = stateDAO.insert(StateCode("1", "2"))
+        sCode shouldBe "1"
+        val cCode = cityDAO.insert(CityCode("3", "4", StateCode("1", "2")))
+        cCode shouldBe "3"
+        cityDAO.findAll should contain theSameElementsAs CityCode("3", "4", StateCode("1", "2")) :: Nil
+      }
+    }
+  }
 }

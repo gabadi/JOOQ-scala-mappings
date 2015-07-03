@@ -4,8 +4,11 @@ import db.test.public.Tables.FULL_USER
 import db.test.public.tables.records.{FullUserRecord, UserWithAddressRecord}
 import db.test.public.{Tables, tables}
 
-class NoCaseProfile(name: Name)
+case class WrongProfile(nam: Name)
 
+case class FullUserWrongProfile(id: Long, profile: WrongProfile, home: Location, work: Location)
+
+class NoCaseProfile(name: Name)
 case class FullUserNoCaseChild(id: Long, profile: NoCaseProfile, home: Location, work: Location)
 
 class NamespaceTest extends BaseSpec {
@@ -234,6 +237,10 @@ class NamespaceTest extends BaseSpec {
       "no case class child" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.FullUser, db.test.public.tables.records.FullUserRecord, com.github.gabadi.scalajooq.FullUserNoCaseChild]"
         assertNoCompiles(code, "Can only map case classes", "NoCaseProfile", "namespacedMetaOf", "FullUserNoCaseChild.profile", "(\"profile\")")
+      }
+      "worng mapping child" in DB.withRollback { dsl =>
+        val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.FullUser, db.test.public.tables.records.FullUserRecord, com.github.gabadi.scalajooq.FullUserWrongProfile]"
+        assertNoCompiles(code, "Name.first", "FullUserWrongProfile.profile", "WrongProfile.nam", "namespacedMetaOf", "FullUserRecord.PROFILE_NAM_FIRST", "(\"profile\")", "(\"profileNam\")")
       }
     }
   }
