@@ -141,11 +141,17 @@ object JooqMeta {
       if (name.startsWith(namespace)) UPPER_CAMEL.to(LOWER_CAMEL, name.drop(namespace.length)) else name
     }
 
-    def tableMembersMap(tableType: c.universe.Type) = tableType.members.map(m => tableMemberToName(m) -> m).toMap
+    def tableMembersMap(tableType: c.universe.Type) = tableType.members
+      .filter { f =>
+      val name = f.name.decodedName.toString
+      name.toUpperCase.equals(name)
+    }.map(m => tableMemberToName(m) -> m).toMap
 
     def recordMembersMap(recordType: c.universe.Type) = recordType.members
       .map(m => m.name.decodedName.toString -> m)
-      .toMap
+      .filter { case (n, m) =>
+      n.startsWith("set") && m.asMethod.paramLists.head.size == 1
+    }.toMap
 
     def tableInstanceMethod(tableType: c.universe.Type) = {
       val tableCompanion = tableType.typeSymbol.companion
@@ -163,7 +169,7 @@ object JooqMeta {
     val recordType = weakTypeOf[R]
 
     val fields = caseClassFields(entityType)
-    val table = tableInstanceMethod(tableType) //q"$tableCompanion.$companionMethod"
+    val table = tableInstanceMethod(tableType)
 
     val tableMembers = tableMembersMap(tableType)
     val recordMembers = recordMembersMap(recordType)
@@ -306,7 +312,6 @@ object JooqMeta {
           }
       }
     }.unzip4
-
 
     val companion = entityType.typeSymbol.companion
 

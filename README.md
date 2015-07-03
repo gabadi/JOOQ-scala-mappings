@@ -9,9 +9,15 @@ JOOQ is a great tool for accessing SQL stores. It's expressive and powerful. But
 
 ### Installation
 ------------
-
-TODO: Publish maven central
-TODO: Depends on jooq 3.6.1 or greater with scala codegen
+Add this definition to the **build.sbt**
+```
+libraryDependencies ++= Seq(
+    "org.jooq"                     %  "jooq"               % "3.6.2",
+    "org.jooq"                     %  "jooq-meta"          % "3.6.2",
+    "com.github.gabadi.scalajooq" %% "jooq-scala-mappings" % "0.0.3"
+)
+```
+**Important**: Depends on scala 2.11 (there is no scala 2.10 version, at least today), and jooq 3.6.1 or greater with the scala codegen.
 
 ### Functionalities
 ---------------
@@ -332,7 +338,12 @@ case class Profile(firstName: String, lastName: String)
 case class User(id: Long, profile: Profile)
 ```
 In this case, the **User** knowns the **Profile**. And the **Profile** knowns the **User**. So the macro can never be resolved.
- 
+ 2. The current version, does not support an the same entity to be referenced twice in the same entity, like in this example.
+```
+case class City(id: Long, name: String)
+
+case class Route(from: City, to: City)
+```
 
 ###Contributing
 ------------

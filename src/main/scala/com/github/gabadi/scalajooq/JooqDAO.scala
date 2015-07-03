@@ -15,17 +15,18 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
   lazy val table = meta.table
   lazy val primaryKeys = List() ++ table.getPrimaryKey.getFields.asScala
   lazy val primaryKey = {
-    if (
-      primaryKeys.size == 1 &&
-        (primaryKeys.head.getDataType.getType.equals(classOf[java.lang.Long])
-          ||
-          primaryKeys.head.getDataType.getType.equals(classOf[Integer]))
-    )
+    if (primaryKeys.size == 1)
       Some(primaryKeys.head.asInstanceOf[TableField[Rec, ID]])
-    else None
+    else
+      None
   }
-  lazy val createFields = (if (primaryKey.isDefined) meta.fields.filterNot(f => primaryKeys.contains(f)) else meta.fields).filter(f => meta.table.fields.exists(_.equals(f)))
+  lazy val createFields = (if (primaryKey.isDefined && isIntOrLong(primaryKey.get)) meta.fields.filterNot(f => primaryKeys.contains(f)) else meta.fields).filter(f => meta.table.fields.exists(_.equals(f)))
   lazy val updateFields = createFields.filterNot(f => immutableFields.contains(f)).filterNot(f => primaryKeys.contains(f))
+
+  def isIntOrLong(field: TableField[Rec, ID]): Boolean = {
+    val fieldType = primaryKeys.head.getDataType.getType
+    fieldType.equals(classOf[java.lang.Long]) || fieldType.equals(classOf[java.lang.Integer]) || fieldType.equals(classOf[Long]) || fieldType.equals(classOf[Int])
+  }
 
   def findAll(implicit dsl: DSLContext): List[Entity] = List() ++ meta.query(dsl).fetch(meta).asScala
 
@@ -93,17 +94,11 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
     }
   }
 
-  private def equal(pk: List[TableField[Rec, _]], id: ID): Condition = {
-    if (pk.length == 1) {
-      pk.head.asInstanceOf[Field[ID]].equal(pk.head.getDataType.convert(id).asInstanceOf[ID])
-    } else {
-      row(pk: _*).equal(id.asInstanceOf[Record])
-    }
-  }
-
   def deleteById(id: ID, idn: ID*)(implicit dsl: DSLContext): Int = deleteByIds(idn :+ id)
 
   def findById(id: ID)(implicit dsl: DSLContext): Option[Entity] = findByIds(id :: Nil).headOption
+
+  def findByIds(id: ID, idn: ID*)(implicit dsl: DSLContext): List[Entity] = findByIds(idn :+ id)
 
   def findByIds(ids: Seq[ID])(implicit dsl: DSLContext): List[Entity] = {
     List() ++ (
@@ -119,7 +114,13 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
       )
   }
 
-  def findByIds(id: ID, idn: ID*)(implicit dsl: DSLContext): List[Entity] = findByIds(idn :+ id)
+  private def equal(pk: List[TableField[Rec, _]], id: ID): Condition = {
+    if (pk.length == 1) {
+      pk.head.asInstanceOf[Field[ID]].equal(pk.head.getDataType.convert(id).asInstanceOf[ID])
+    } else {
+      row(pk: _*).equal(id.asInstanceOf[Record])
+    }
+  }
 }
 
 
