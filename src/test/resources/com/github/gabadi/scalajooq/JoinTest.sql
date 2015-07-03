@@ -17,3 +17,10 @@ CREATE TABLE `country` (
   `name` varchar(50),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `road` (
+  `from_city_id` bigint(20) NOT NULL,
+  `to_city_id` bigint(20) NOT NULL,
+  `name` varchar(50),
+  PRIMARY KEY (`from_city_id`, `to_city_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;

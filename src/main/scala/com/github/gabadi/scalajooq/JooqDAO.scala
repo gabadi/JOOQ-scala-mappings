@@ -43,7 +43,7 @@ abstract class JooqDAO[Rec <: UpdatableRecord[Rec], ID, Entity](implicit meta: J
     }
   }
 
-  protected def compositeKeyRecord(values: AnyRef*)(implicit dsl: DSLContext): ID = {
+  protected def compositeKeyRecord(values: List[Any])(implicit dsl: DSLContext): ID = {
     val key = table.getPrimaryKey
     if (key == null) {
       throw new RuntimeException(s"table: $table does not has a defined primary key")

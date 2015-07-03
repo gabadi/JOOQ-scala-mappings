@@ -2,8 +2,8 @@ package com.github.gabadi.scalajooq
 
 import db.test.public.Tables.{CITY, COUNTRY, STATE}
 import db.test.public.tables
-import db.test.public.tables.records.{CityRecord, CountryRecord, StateRecord}
-import org.jooq.DSLContext
+import db.test.public.tables.records.{RoadRecord, CityRecord, CountryRecord, StateRecord}
+import org.jooq.{Record2, DSLContext}
 
 case class City(id: Long, name: String, state: State)
 
@@ -12,6 +12,8 @@ case class CityOptState(id: Long, name: String, state: Option[State])
 case class State(id: Long, name: String, country: Country)
 
 case class Country(id: Long, name: String)
+
+case class Road(fromCity: CityOptState, toCity: CityOptState)
 
 class JoinTest extends BaseSpec {
 
@@ -38,7 +40,9 @@ class JoinTest extends BaseSpec {
                     val countries: DefaultJooqDAO[CountryRecord, Country],
                     val states: DefaultJooqDAO[StateRecord, State],
                     val cities: DefaultJooqDAO[CityRecord, City],
-                    val citiesOptState: DefaultJooqDAO[CityRecord, CityOptState]) {
+                    val citiesOptState: DefaultJooqDAO[CityRecord, CityOptState],
+                    val roads: GenericJooqDAO[RoadRecord, Record2[Long, Long], Road]
+                    ) {
       def insertCountry(c: Country)(implicit dsl: DSLContext) = {
         val id = countries.insert(c)
         c.copy(id = id)
@@ -65,12 +69,14 @@ class JoinTest extends BaseSpec {
       implicit val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
       implicit val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
       implicit val cityOptStateMeta = JooqMeta.metaOf[tables.City, CityRecord, CityOptState]
+      implicit val roadMeta = JooqMeta.metaOf[tables.Road, RoadRecord, Road]
 
       val countryDAO = new DefaultJooqDAO[CountryRecord, Country]() {}
       val stateDAO = new DefaultJooqDAO[StateRecord, State]() {}
       val cityDAO = new DefaultJooqDAO[CityRecord, City]() {}
       val cityOptStateDAO = new DefaultJooqDAO[CityRecord, CityOptState]() {}
-      new JoinDAOs(countryDAO, stateDAO, cityDAO, cityOptStateDAO)
+      val roadDAO = new GenericJooqDAO[RoadRecord, Record2[Long, Long], Road]() {}
+      new JoinDAOs(countryDAO, stateDAO, cityDAO, cityOptStateDAO, roadDAO)
     }
 
     "dao" should {
@@ -118,6 +124,22 @@ class JoinTest extends BaseSpec {
         s2.name shouldBe "s2"
 
         co.name shouldBe "c"
+      }
+    }
+
+    "compositeId" should {
+      "support DAO insert" in DB.withRollback { implicit dsl =>
+        val c1 = joinDAOs.insertCityOptState(CityOptState(0, "name1", None))
+        val c2 = joinDAOs.insertCityOptState(CityOptState(0, "name2", None))
+        val id = joinDAOs.roads.insert(Road(c1, c2))
+        id.getValue(0) shouldBe c1.id
+        id.getValue(1) shouldBe c2.id
+      }
+      "support DAO find" in DB.withRollback { implicit dsl =>
+        val c1 = joinDAOs.insertCityOptState(CityOptState(0, "name1", None))
+        val c2 = joinDAOs.insertCityOptState(CityOptState(0, "name2", None))
+        joinDAOs.roads.insert(Road(c1, c2))
+        joinDAOs.roads.findAll should contain theSameElementsAs Road(c1, c2) :: Nil
       }
     }
   }
