@@ -1,7 +1,7 @@
 package com.github.gabadi.scalajooq
 
 import com.github.gabadi.scalajooq.JooqMeta.metaOf
-import db.test.public.Tables.{CITY, COUNTRY, STATE}
+import db.test.public.Tables._
 import db.test.public.tables
 import db.test.public.tables.records._
 import org.jooq.DSLContext
@@ -23,19 +23,42 @@ class JoinTest extends BaseSpec {
   "Join" when {
     "selectTable" should {
       "has the correct inner join" in DB.withRollback { dsl =>
-        implicit lazy val countryMeta = metaOf[tables.Country, CountryRecord, Country]
-        implicit lazy val stateMeta = metaOf[tables.State, StateRecord, State]
-        implicit lazy val cityMeta = metaOf[tables.City, CityRecord, City]
+        implicit val countryMeta = metaOf[tables.Country, CountryRecord, Country]
+        implicit val stateMeta = metaOf[tables.State, StateRecord, State]
+        implicit val cityMeta = metaOf[tables.City, CityRecord, City]
 
-        cityMeta.selectTable.toString shouldBe (CITY join STATE).on(CITY.STATE_ID equal STATE.ID).join(COUNTRY).on(STATE.COUNTRY_ID equal COUNTRY.ID).toString
+        cityMeta.selectTable.toString shouldBe
+          (CITY join STATE).
+            on(CITY.STATE_ID equal STATE.ID).
+            join(COUNTRY).
+            on(STATE.COUNTRY_ID equal COUNTRY.ID
+            ).toString
+        /*
+        cityMeta.selectTable.toString shouldBe
+          (CITY join STATE.as("state")).
+            on(CITY.STATE_ID equal STATE.as("state").ID).
+            join(COUNTRY.as("state_country")).
+            on(STATE.as("state").COUNTRY_ID equal COUNTRY.as("state_country").ID
+            ).toString
+         */
       }
-
       "has the correct outer join" in DB.withRollback { dsl =>
         implicit lazy val countryMeta = metaOf[tables.Country, CountryRecord, Country]
         implicit lazy val stateMeta = metaOf[tables.State, StateRecord, State]
         implicit lazy val cityOptMeta = metaOf[tables.City, CityRecord, CityOptState]
 
-        cityOptMeta.selectTable.toString shouldBe (CITY leftOuterJoin STATE).on(CITY.STATE_ID equal STATE.ID).leftOuterJoin(COUNTRY).on(STATE.COUNTRY_ID equal COUNTRY.ID).toString
+        cityOptMeta.selectTable.toString shouldBe (
+          CITY leftOuterJoin STATE).
+          on(CITY.STATE_ID equal STATE.ID).
+          leftOuterJoin(COUNTRY).
+          on(STATE.COUNTRY_ID equal COUNTRY.ID
+          ).toString
+        /*          cityOptMeta.selectTable.toString shouldBe (
+                    CITY leftOuterJoin STATE.as("state")).
+                    on(CITY.STATE_ID equal STATE.as("state").ID).
+                    leftOuterJoin(COUNTRY.as("state_country")).
+                    on(STATE.as("state").COUNTRY_ID equal COUNTRY.as("state_country").ID
+                    ).toString*/
       }
     }
 

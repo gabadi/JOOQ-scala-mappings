@@ -1,4 +1,4 @@
-import ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "JOOQ-scala-mappings"
 
@@ -7,8 +7,12 @@ organization := "com.github.gabadi.scalajooq"
 scalaVersion := Dependencies.scalaV
 
 lazy val macros = project.in(file("."))
-  .settings(Dependencies.settings : _*)
-  .settings(TestSettings.testSettings :_*)
+  .settings(Dependencies.settings: _*)
+  .settings(TestSettings.testSettings: _*)
+  .settings(
+    crossScalaVersions := Seq("2.10.2", "2.10.3", "2.10.4", "2.10.5", "2.11.0", "2.11.1", "2.11.2", "2.11.3", "2.11.4", "2.11.5", "2.11.6", "2.11.7"),
+    addCompilerPlugin("org.scalamacros" % "paradise" % Dependencies.paradiseV cross CrossVersion.full)
+  )
 
 scalacOptions in ThisBuild ++= Seq(
   "-target:jvm-1.7",

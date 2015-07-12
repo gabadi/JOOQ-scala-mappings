@@ -14,10 +14,13 @@ object Dependencies {
     "com.twitter"           %% "util-eval"             % "6.24.0" % Test,
     "com.google.guava"       % "guava"                 % "18.0"
   )
+
   lazy val settings = Seq(
     scalaVersion := scalaV,
     libraryDependencies ++= macrosLibraryDependencies
   )
   val jooqVersion = "3.6.2"
-  val scalaV = "2.11.6"
+  val scalaV = "2.11.7"
+  val paradiseV = "2.1.0-M5"
+  //val paradiseV = "2.0.1"
 }

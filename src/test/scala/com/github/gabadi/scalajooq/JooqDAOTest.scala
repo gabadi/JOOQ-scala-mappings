@@ -4,13 +4,11 @@ import db.test.public.Tables.USER
 import db.test.public.tables
 import db.test.public.tables.records.UserRecord
 import org.jooq.DSLContext
-import org.jooq.scala.Conversions._
 
 class JooqDAOTest extends BaseSpec {
 
-  implicit lazy val userMeta = JooqMeta.metaOf[tables.User, UserRecord, User]
-
   lazy val userDAO = new DefaultJooqDAO[UserRecord, User]() {}
+  implicit val userMeta = JooqMeta.metaOf[tables.User, UserRecord, User]
 
   def insert(user: User)(implicit dsl: DSLContext) = {
     val id = userDAO.insert(user)
@@ -34,8 +32,8 @@ class JooqDAOTest extends BaseSpec {
       }
       "persist vararg" in DB.withRollback { implicit dsl =>
         userDAO.insert(User(0, "name1", "last1"), User(0, "name2", "last2"))
-        val u1count = dsl.selectCount().from(USER).where(USER.FIRST_NAME === "name1").and(USER.LAST_NAME === "last1").fetchOne().value1()
-        val u2count = dsl.selectCount().from(USER).where(USER.FIRST_NAME === "name2").and(USER.LAST_NAME === "last2").fetchOne().value1()
+        val u1count = dsl.selectCount().from(USER).where(USER.FIRST_NAME equal "name1").and(USER.LAST_NAME equal "last1").fetchOne().value1()
+        val u2count = dsl.selectCount().from(USER).where(USER.FIRST_NAME equal "name2").and(USER.LAST_NAME equal "last2").fetchOne().value1()
 
         u1count shouldBe 1
         u2count shouldBe 1
@@ -59,8 +57,8 @@ class JooqDAOTest extends BaseSpec {
     "insertAll" should {
       "persist list" in DB.withRollback { implicit dsl =>
         userDAO.insertAll(User(0, "name1", "last1") :: User(0, "name2", "last2") :: Nil)
-        val u1count = dsl.selectCount().from(USER).where(USER.FIRST_NAME === "name1").and(USER.LAST_NAME === "last1").fetchOne().value1()
-        val u2count = dsl.selectCount().from(USER).where(USER.FIRST_NAME === "name2").and(USER.LAST_NAME === "last2").fetchOne().value1()
+        val u1count = dsl.selectCount().from(USER).where(USER.FIRST_NAME equal "name1").and(USER.LAST_NAME equal "last1").fetchOne().value1()
+        val u2count = dsl.selectCount().from(USER).where(USER.FIRST_NAME equal "name2").and(USER.LAST_NAME equal "last2").fetchOne().value1()
 
         u1count shouldBe 1
         u2count shouldBe 1
@@ -239,5 +237,4 @@ class JooqDAOTest extends BaseSpec {
     }
 
   }
-
 }

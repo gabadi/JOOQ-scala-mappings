@@ -21,6 +21,13 @@ import scala.util.control.NonFatal
 
 object TestSettings {
 
+  val testSettings = DBTasks.settings ++ Seq(
+    testOptions in Test += Tests.Cleanup(loader => {
+      loader.loadClass("org.h2.tools.Server").getMethod("main", classOf[Array[String]]).invoke(null, Array("-tcpShutdown", "tcp://localhost:9092"))
+    })
+  )
+
+
   object DBTasks {
     val dbStart = TaskKey[Seq[File]]("dbStart", "Starts the DB.")
     val dbStop = TaskKey[Unit]("dbStop", "Stop the DB.")
@@ -40,6 +47,13 @@ object TestSettings {
         val options = ForkOptions(bootJars = h2jars)
         val shoutDownCommand = "org.h2.tools.Server" :: "-tcpShutdown" :: s"tcp://$dbHost:$dbPort" :: Nil
         val startUpCommand = "org.h2.tools.Server" :: "-tcp" :: "-tcpPort" :: dbPort :: Nil
+
+
+        def recursiveListFiles(f: File): Seq[File] = {
+          val files = Option(f.listFiles).toSeq.flatten
+          files ++ files.filter(_.isDirectory).flatMap(recursiveListFiles)
+        }
+        val scripts = recursiveListFiles(resourceDirectory).filter(_.getName.toLowerCase.endsWith("test.sql"))
 
         def filtered(line: String) = {
           val pattern = """((?:\\?)\$\{.+?\})""".r
@@ -81,36 +95,38 @@ object TestSettings {
           }), 1 minute)
         }
 
-        def recursiveListFiles(f: File): Seq[File] = {
-          val files = Option(f.listFiles).toSeq.flatten
-          files ++ files.filter(_.isDirectory).flatMap(recursiveListFiles)
-        }
-
         def migrationCommand(scripts: Seq[File]) = {
           val migrations = scripts.map(s => s"RUNSCRIPT FROM '$s'").mkString("\\;")
           "org.h2.tools.Shell" :: "-url" :: s"$dbUrl;INIT=$migrations" :: "-sql" :: "show tables" :: Nil
         }
 
         def migrations = {
-          val scripts = recursiveListFiles(resourceDirectory).filter(_.getName.toLowerCase.endsWith("test.sql"))
           Fork.java(options, migrationCommand(scripts = scripts))
         }
 
         def runJooqCodeGen() = {
-          def filteredJooqConf(configFile: File) = {
-            val result = StringBuilder.newBuilder
-            for (line <- Source.fromFile(configFile).getLines()) {
-              result append filtered(line)
-              result append "\n"
-            }
-            GenerationTool.load(new ByteArrayInputStream(result.toString().getBytes))
-          }
-          val jooqConf = filteredJooqConf(new File(resourceDirectory, "jooq.xml"))
+          val jooqConfFile = new File(resourceDirectory, "jooq.xml")
+          val targetDir = ct / "jooq" / "test"
 
-          jooqConf.getGenerator.getTarget.setDirectory((ct / "jooq" / "test").toString)
-          FileUtil.forceDelete(ct / "jooq" / "test")
-          GenerationTool.generate(jooqConf)
-          recursiveListFiles(ct / "jooq" / "test").filter(_.isFile)
+          def internalRunJooqCodeGen(in: Set[File]) = {
+            def filteredJooqConf(configFile: File) = {
+              val result = StringBuilder.newBuilder
+              for (line <- Source.fromFile(configFile).getLines()) {
+                result append filtered(line)
+                result append "\n"
+              }
+              GenerationTool.load(new ByteArrayInputStream(result.toString().getBytes))
+            }
+            val jooqConf = filteredJooqConf(jooqConfFile)
+            jooqConf.getGenerator.getTarget.setDirectory(targetDir.getAbsolutePath)
+            FileUtil.forceDelete(targetDir)
+            GenerationTool.generate(jooqConf)
+            recursiveListFiles(targetDir).filter(_.isFile).toSet
+          }
+
+          val cachedEvolutionAndJooq = FileFunction.cached(targetDir, inStyle = FilesInfo.hash, outStyle = FilesInfo.hash)(internalRunJooqCodeGen)
+
+          cachedEvolutionAndJooq((scripts ++ Seq(jooqConfFile)).toSet).toSeq
         }
 
         stopIfRunning
@@ -125,12 +141,5 @@ object TestSettings {
       })
     )
   }
-
-
-  val testSettings = DBTasks.settings ++ Seq(
-    testOptions in Test += Tests.Cleanup(loader => {
-      loader.loadClass("org.h2.tools.Server").getMethod("main", classOf[Array[String]]).invoke(null, Array("-tcpShutdown", "tcp://localhost:9092"))
-    })
-  )
 }
 

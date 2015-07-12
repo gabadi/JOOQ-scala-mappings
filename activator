@@ -127,8 +127,8 @@ addConfigOpts () {
 # a ham-fisted attempt to move some memory settings in concert
 # so they need not be messed around with individually.
 get_mem_opts () {
-  local mem=${1:-1024}
-  local meta=$(( $mem / 4 ))
+  local mem=${1:-2048}
+  local meta=$(( $mem / 2 ))
   (( $meta > 256 )) || meta=256
   (( $meta < 1024 )) || meta=1024
 

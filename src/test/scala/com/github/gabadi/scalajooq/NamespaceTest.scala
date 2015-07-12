@@ -1,14 +1,15 @@
 package com.github.gabadi.scalajooq
 
-import db.test.public.Tables.FULL_USER
+import db.test.public.Tables.{FULL_USER, USER_WITH_ADDRESS}
+import db.test.public.tables
 import db.test.public.tables.records.{FullUserRecord, UserWithAddressRecord}
-import db.test.public.{Tables, tables}
 
 case class WrongProfile(nam: Name)
 
 case class FullUserWrongProfile(id: Long, profile: WrongProfile, home: Location, work: Location)
 
 class NoCaseProfile(name: Name)
+
 case class FullUserNoCaseChild(id: Long, profile: NoCaseProfile, home: Location, work: Location)
 
 class NamespaceTest extends BaseSpec {
@@ -16,30 +17,30 @@ class NamespaceTest extends BaseSpec {
   "Namespace" when {
     "fields" should {
       "be only mapped" in DB.withRollback { dsl =>
-        implicit lazy val nameMapping = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Name]("profileName")
-        implicit lazy val profileMapping = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Profile]("profile")
-        val mapper = JooqMeta.metaOf[tables.FullUser, FullUserRecord, ProfileUser]
+        implicit val NameMapping = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Name]("profileName")
+        implicit val ProfileMapping = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Profile]("profile")
+        val Mapper = JooqMeta.metaOf[tables.FullUser, FullUserRecord, ProfileUser]
 
-        mapper.fields should contain theSameElementsAs FULL_USER.ID :: FULL_USER.PROFILE_NAME_FIRST :: FULL_USER.PROFILE_NAME_LAST :: Nil
+        Mapper.fields should contain theSameElementsAs FULL_USER.ID :: FULL_USER.PROFILE_NAME_FIRST :: FULL_USER.PROFILE_NAME_LAST :: Nil
       }
     }
     "map record to entity" should {
       "map namespace values" in DB.withRollback { dsl =>
 
-        val record = dsl.newRecord(Tables.USER_WITH_ADDRESS)
+        val record = dsl.newRecord(USER_WITH_ADDRESS)
         record.setAddressNumber(1l)
         record.setAddressStreet("street")
         record.setAddressTelephone("tel")
 
-        val mapper = JooqMeta.namespacedMetaOf[tables.UserWithAddress, UserWithAddressRecord, Address]("address")
+        val Mapper = JooqMeta.namespacedMetaOf[tables.UserWithAddress, UserWithAddressRecord, Address]("address")
 
-        val entity = mapper.toEntity(record)
+        val entity = Mapper.toEntity(record)
         entity shouldBe Address("street", 1, "tel")
       }
 
       "map namespace values nested" in DB.withRollback { dsl =>
 
-        val record = dsl.newRecord(Tables.USER_WITH_ADDRESS)
+        val record = dsl.newRecord(USER_WITH_ADDRESS)
         record.setAddressNumber(1l)
         record.setAddressStreet("street")
         record.setAddressTelephone("tel")
@@ -56,7 +57,7 @@ class NamespaceTest extends BaseSpec {
 
       "map namespace values nested option present" in DB.withRollback { dsl =>
 
-        val record = dsl.newRecord(Tables.USER_WITH_ADDRESS)
+        val record = dsl.newRecord(USER_WITH_ADDRESS)
         record.setAddressNumber(1l)
         record.setAddressStreet("street")
         record.setId(2l)
@@ -73,12 +74,12 @@ class NamespaceTest extends BaseSpec {
 
       "map namespace values nested option absent" in DB.withRollback { dsl =>
 
-        val record = dsl.newRecord(Tables.USER_WITH_ADDRESS)
+        val record = dsl.newRecord(USER_WITH_ADDRESS)
         record.setId(2l)
         record.setFirstName("name")
         record.setLastName("last")
 
-        implicit val addressMapping = JooqMeta.namespacedMetaOf[tables.UserWithAddress, UserWithAddressRecord, Address]("address")
+        implicit val addressMapping = JooqMeta.namespacedMetaOf[tables.UserWithAddress, UserWithAddressRecord, Address](("address"))
         val mapper = JooqMeta.metaOf[tables.UserWithAddress, UserWithAddressRecord, UserWithOptAddress]
 
         val entity = mapper.toEntity(record)
@@ -236,13 +237,12 @@ class NamespaceTest extends BaseSpec {
     "fails on" should {
       "no case class child" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.FullUser, db.test.public.tables.records.FullUserRecord, com.github.gabadi.scalajooq.FullUserNoCaseChild]"
-        assertNoCompiles(code, "Can only map case classes", "NoCaseProfile", "namespacedMetaOf", "FullUserNoCaseChild.profile", "(\"profile\")")
+        assertNoCompiles(code, "only case classes are supported", "NoCaseProfile", "FullUserNoCaseChild.profile", "##")
       }
-      "worng mapping child" in DB.withRollback { dsl =>
+      "wrong mapping child" in DB.withRollback { dsl =>
         val code = s"com.github.gabadi.scalajooq.JooqMeta.metaOf[db.test.public.tables.FullUser, db.test.public.tables.records.FullUserRecord, com.github.gabadi.scalajooq.FullUserWrongProfile]"
-        assertNoCompiles(code, "Name.first", "FullUserWrongProfile.profile", "WrongProfile.nam", "namespacedMetaOf", "FullUserRecord.PROFILE_NAM_FIRST", "(\"profile\")", "(\"profileNam\")")
+        assertNoCompiles(code, "Name.first", "FullUserWrongProfile.profile", "WrongProfile.nam", "FullUserRecord.PROFILE_NAM_FIRST", "####")
       }
     }
   }
-
 }

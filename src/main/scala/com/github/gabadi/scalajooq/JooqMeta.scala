@@ -1,12 +1,13 @@
 package com.github.gabadi.scalajooq
 
-import com.google.common.base.CaseFormat.{LOWER_CAMEL, UPPER_CAMEL, UPPER_UNDERSCORE}
+import com.github.gabadi.scalajooq.meta.JooqMetaType
 import org.jooq.impl.TableImpl
-import org.jooq.{DSLContext, Field, Record, RecordMapper, Table}
+import org.jooq.{DSLContext, Record, RecordMapper, Table}
 
+import scala.language.existentials
 import scala.language.experimental.macros
-import scala.reflect.macros.TypecheckException
 import scala.reflect.macros.blackbox.Context
+import scala.util.{Failure, Success}
 
 trait JooqMeta[T <: Table[R], R <: Record, E] extends RecordMapper[Record, E] {
 
@@ -14,25 +15,17 @@ trait JooqMeta[T <: Table[R], R <: Record, E] extends RecordMapper[Record, E] {
 
   lazy val selectTable = joinedTable(table.asInstanceOf[Table[Record]])
 
-  def joinedTable(current: Table[Record], leftJoin: Boolean = false): Table[Record]
+  def joinedTable(current: Table[Record], namespace: Option[String] = None, leftJoin: Boolean = false): Table[Record]
 
   lazy val fields = selectTable.fields()
 
-  lazy val aliasedFields = fields.map(f => withAlias(f))
-
-  def withAlias[G](field: org.jooq.Field[G]): org.jooq.Field[G] = field.as(field.toString)
-
   override def map(record: Record): E = toEntity(record)
 
-  def toEntity(record: Record): E = toEntityAliased(record, false)
+  def toEntity(record: Record): E
 
-  def toEntityAliased(record: Record, aliased: Boolean = true): E
-
-  def toOptEntity[G >: R <: Record](record: Record): Option[E] = toOptEntityAliased(record, false)
-
-  def toOptEntityAliased[G >: R <: Record](record: Record, aliased: Boolean = true): Option[E] = {
-    val isNull = (if (aliased) aliasedFields else fields).forall(f => null == record.getValue(f))
-    if (isNull) None else Some(toEntityAliased(record, aliased))
+  def toOptEntity[G >: R <: Record](record: Record): Option[E] = {
+    val isNull = fields.forall(f => null == record.getValue(f))
+    if (isNull) None else Some(toEntity(record))
   }
 
   def toRecord(e: E, current: R = null.asInstanceOf[R])(implicit dsl: DSLContext): R
@@ -46,300 +39,131 @@ object JooqMeta {
   def metaOf[T <: TableImpl[R], R <: Record, E]: JooqMeta[T, R, E] =
   macro materializeRecordMapperImpl[T, R, E]
 
+  def materializeType[T]: (T) => T = macro materializeTypeImpl[T]
 
   def namespacedMetaOf[T <: TableImpl[R], R <: Record, E](namespace: String): JooqMeta[T, R, E] =
   macro materializeNamespacedRecordMapperImpl[T, R, E]
 
   def materializeRecordMapperImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context): c.Expr[JooqMeta[T, R, E]] = {
-    createMetaImpl[T, R, E](c, "")
+    createMetaImpl[T, R, E](c, None)
   }
 
 
   def materializeNamespacedRecordMapperImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context)(namespace: c.Expr[String]): c.Expr[JooqMeta[T, R, E]] = {
-    createMetaImpl[T, R, E](c, c.eval(namespace))
+    createMetaImpl[T, R, E](c, Some(c.eval(namespace)))
   }
 
-
-  def createMetaImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context, namespace: String): c.Expr[JooqMeta[T, R, E]] = {
+  def materializeTypeImpl[T: c.WeakTypeTag](c: Context): c.Expr[(T) => T] = {
     import c.universe._
 
-    def canNotFindMapIdFieldBetween(table: c.universe.Type, entityMethod: String) = {
-      c.abort(c.enclosingPosition,
-        s"""
-           |Mappings error between:
-           |can not map $entityMethod with table $table
-           """.stripMargin)
+    val tType = weakTypeOf[T]
+    c.Expr[(T) => T](
+      q"""
+          {
+            def function(t: $tType):$tType = t
+            function
+          }
+        """)
+  }
+
+  def createMetaImpl[T <: TableImpl[R] : c.WeakTypeTag, R <: Record : c.WeakTypeTag, E: c.WeakTypeTag](c: Context, namespace: Option[String]): c.Expr[JooqMeta[T, R, E]] = {
+    import c.universe._
+    val jooqMacroMapper = {
+      val n = namespace
+      new {
+        val co: c.type = c
+        val namespace = n
+      } with JooqMacroMapper[c.type]
     }
-
-    def implicitConversion(from: Type, to: Type) = {
-      val r = c.inferImplicitValue(
-        appliedType(typeOf[(_) => _].typeConstructor, from, to))
-      if (r.equalsStructure(EmptyTree)) {
-        c.abort(c.enclosingPosition,
-          s"""
-             |Mappings error between:
-             |can not find an implicit conversion from $from to $to
-           """.stripMargin)
-      }
-      r
-    }
-
-    def assertIsJooqMeta(mapper: c.universe.Tree) = {
-      if (!mapper.tpe.typeSymbol.equals(symbolOf[JooqMeta[_, _, _]])) {
-        c.abort(c.enclosingPosition,
-          s"""
-             |Mappings error between:
-             |$mapper must be an instance of ${weakTypeOf[JooqMeta[_, _, _]]}
-           """.stripMargin)
-      }
-    }
-
-    def abortCanNotFindImplicitConversion(from: String, to: String) = {
-      c.abort(c.enclosingPosition,
-        s"""
-           |Mappings error between:
-           |Can not find an implicit conversion between $from and $to
-           """.stripMargin)
-    }
-
-    def abortFieldCanNotBeMapped(field: String, tree: c.universe.Tree, message: String) = {
-      c.abort(c.enclosingPosition,
-        s"""
-           |Mappings error:
-           |Can not create the mapping for $field
-            |Tried to: $tree
-            |But failed with: $message
-           """.stripMargin)
-    }
-
-    def abortFieldNotFoundInRecord(entity: String, record: String) = {
-      c.abort(c.enclosingPosition,
-        s"""
-           |Mappings error:
-           |$entity expects a $record column, but doesn't exists
-             """.stripMargin)
-    }
-
-
-    def checkCaseClass(symbol: c.universe.ClassSymbol) = {
-      if (!symbol.isClass || !symbol.isCaseClass)
-        c.abort(c.enclosingPosition, "Can only map case classes.")
-    }
-
-    def caseClassFields(caseClass: c.universe.Type) = {
-      checkCaseClass(caseClass.typeSymbol.asClass)
-      val declarations = caseClass.decls
-      val ctor = declarations.collectFirst {
-        case m: MethodSymbol if m.isPrimaryConstructor => m
-      }.get
-      ctor.paramLists.head
-    }
-
-    def tableMemberToName(symbol: c.universe.Symbol) = {
-      val name = UPPER_UNDERSCORE.to(LOWER_CAMEL, symbol.name.decodedName.toString)
-      if (name.startsWith(namespace)) UPPER_CAMEL.to(LOWER_CAMEL, name.drop(namespace.length)) else name
-    }
-
-    def tableMembersMap(tableType: c.universe.Type) = tableType.members
-      .filter { f =>
-      val name = f.name.decodedName.toString
-      name.toUpperCase.equals(name)
-    }.map(m => tableMemberToName(m) -> m).toMap
-
-    def recordMembersMap(recordType: c.universe.Type) = recordType.members
-      .map(m => m.name.decodedName.toString -> m)
-      .filter { case (n, m) =>
-      n.startsWith("set") && m.asMethod.paramLists.head.size == 1
-    }.toMap
-
-    def tableInstanceMethod(tableType: c.universe.Type) = {
-      val tableCompanion = tableType.typeSymbol.companion
-      val companionMethod = TermName(LOWER_CAMEL.to(UPPER_UNDERSCORE, tableType.typeSymbol.name.decodedName.toString))
-      q"$tableCompanion.$companionMethod"
-    }
-
-    val packag = q"com.github.gabadi.scalajooq"
-    val jooqMeta = q"$packag.JooqMeta"
-    def checkNotNullTree(tree: Tree, message: String) = q"$packag.Constraints.checkNotNull($tree, $message)"
-
 
     val tableType = weakTypeOf[T]
     val entityType = weakTypeOf[E]
     val recordType = weakTypeOf[R]
 
-    val fields = caseClassFields(entityType)
-    val table = tableInstanceMethod(tableType)
-
-    val tableMembers = tableMembersMap(tableType)
-    val recordMembers = recordMembersMap(recordType)
-
-    val (toEntityParams, toRecordParams, mappedFields, joins) = fields.map { field =>
-      val fieldName = field.name.decodedName.toString
-      val fieldTermName = field.asTerm.name
-      val columnName = LOWER_CAMEL.to(UPPER_UNDERSCORE, fieldName)
-      val fieldIsOption = field.typeSignature <:< typeOf[Option[_]]
-      val effectiveFieldType = if (fieldIsOption) field.typeSignature.typeArgs.head else field.typeSignature
-      tableMembers.get(fieldName) match {
-        // direct matching between record and entity
-        case Some(recordMember) =>
-          val recordSetter = recordMembers.get(s"set${namespace.capitalize}${fieldName.capitalize}").get
-
-          val recordFieldType = recordSetter.asMethod.paramLists.head.head.typeSignature
-
-          val e2rTypeConversion = implicitConversion(from = effectiveFieldType, to = recordFieldType)
-          val r2eTypeConversion = implicitConversion(from = recordFieldType, to = effectiveFieldType)
-
-          val getMaybeAliasedValue = q"if(aliased) r.getValue(withAlias(table.$recordMember)) else r.getValue(table.$recordMember)"
-
-          if ((r2eTypeConversion equalsStructure EmptyTree) || (e2rTypeConversion equalsStructure EmptyTree)) {
-            abortCanNotFindImplicitConversion(s"$entityType.$fieldName($effectiveFieldType)", s"$recordType.$columnName($recordFieldType)")
-          } else {
-            if (fieldIsOption) {
-              (q"$fieldTermName = Option($getMaybeAliasedValue).map($r2eTypeConversion)",
-                q"r.$recordSetter(e.$fieldTermName.map($e2rTypeConversion).orNull[$recordFieldType])",
-                q"f = f ++ Array($table.$recordMember)",
-                Nil)
-            } else {
-              val nullInRecordMessage = s"${recordMember.name.decodedName.toString} in record ${recordType.typeSymbol.name.decodedName.toString} is null in the database. This is inconsistent"
-              val nullInEntityMessage = s"$fieldName in entity ${entityType.typeSymbol.name.decodedName.toString} must not be null"
-              val entityFieldConverted = q"$e2rTypeConversion(e.$fieldTermName)"
-              (q"$fieldTermName = $r2eTypeConversion(${checkNotNullTree(getMaybeAliasedValue, nullInRecordMessage)})",
-                q"r.$recordSetter(${checkNotNullTree(entityFieldConverted, nullInEntityMessage)})",
-                q"f = f ++ Array($table.$recordMember)",
-                Nil)
-            }
-          }
-        case None =>
-          // there is no matching between record and entity
-          val implicitMapper = {
-            val expectedImplicitMapperType = appliedType(typeOf[RecordMapper[_, _]].typeConstructor, typeOf[Record], effectiveFieldType)
-            val implicitMapper = c.inferImplicitValue(expectedImplicitMapperType)
-            // exists an implicit JooqMeta
-            if (!implicitMapper.equalsStructure(EmptyTree)) {
-              assertIsJooqMeta(implicitMapper)
-              implicitMapper
-            } else {
-              // try to resolve like an embedded entity
-              val newNamespace = s"$namespace${if (namespace.isEmpty) fieldName else fieldName.capitalize}"
-              val newNamespaceUpper = LOWER_CAMEL.to(UPPER_UNDERSCORE, newNamespace)
-              val mayExistNamespace = tableType.members.exists(_.name.decodedName.toString.startsWith(newNamespaceUpper))
-
-              if (!mayExistNamespace) {
-                abortFieldNotFoundInRecord(s"$entityType.$fieldName", s"$recordType.$newNamespaceUpper")
-              } else {
-                val tree = q"""$jooqMeta.namespacedMetaOf[$tableType, $recordType, $effectiveFieldType]($newNamespace)"""
-                try {
-                  c.typecheck(tree = tree).tpe
-                } catch {
-                  case e: TypecheckException =>
-                    abortFieldCanNotBeMapped(s"$entityType.$fieldName", tree, e.getMessage)
-                }
-                tree
-              }
-            }
-          }
-
-          val mapperRecordType = c.typecheck(implicitMapper).tpe.typeArgs(1)
-
-          val toEntity = if (fieldIsOption) q"$implicitMapper.${TermName("toOptEntityAliased")}" else q"$implicitMapper.${TermName("toEntityAliased")}"
-
-          // is an embedded entity
-          if (mapperRecordType.equals(recordType)) {
-            val toRecord = q"$implicitMapper.${TermName("toRecord")}"
-
-            (q"$field = $toEntity(r, aliased)",
-              if (fieldIsOption) {
-                q"e.${TermName(fieldName)}.foreach(o => $toRecord(o, r))"
-              } else {
-                q"$toRecord(e.${TermName(fieldName)}, r)"
-              },
-              q"f = f ++ $implicitMapper.${TermName("fields")}",
-              Nil)
-          } else {
-            // try to resolve like a joined entity
-            val idSuffix = {
-              val joinedTableType = implicitMapper.tpe.typeArgs.head
-              val maybeMappedMethods = tableMembers.keySet.filter(f => f.startsWith(fieldName))
-              if (maybeMappedMethods.isEmpty) {
-                canNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")
-              } else if (maybeMappedMethods.size == 1) {
-                val suffix = maybeMappedMethods.head.replaceFirst(fieldName, "")
-                s"${suffix.substring(0, 0).toLowerCase}${suffix.substring(1, suffix.length)}"
-              } else {
-                if (maybeMappedMethods.exists(_.equals(fieldName + "Id"))) {
-                  "id"
-                } else if (maybeMappedMethods.exists(_.equals(fieldName + "Oid"))) {
-                  "oid"
-                } else if (maybeMappedMethods.exists(_.equals(fieldName + "Code"))) {
-                  "code"
-                } else {
-                  // improve message
-                  canNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")
-                }
-
-              }
-            }
-            val tableFieldName = LOWER_CAMEL.to(UPPER_UNDERSCORE, s"$fieldName${idSuffix.capitalize}")
-            val joinTableFieldName = LOWER_CAMEL.to(UPPER_UNDERSCORE, s"$idSuffix")
-            val recordSetter = recordMembers.get(s"set${fieldName.capitalize}${idSuffix.capitalize}").get
-            val fieldTypeIdMember = effectiveFieldType.member(TermName(idSuffix))
-            val fieldTypeIdType = fieldTypeIdMember.asMethod.returnType
-            val recordSetterType = recordSetter.typeSignature.paramLists.head.head.typeSignature
-            val e2rTypeConversion = implicitConversion(from = fieldTypeIdType, to = recordSetterType)
-            val nullInEntityMessage = s"$fieldName in entity ${entityType.typeSymbol.name.decodedName.toString} must not be null"
-            val entityFieldConverted = q"$e2rTypeConversion(e.$fieldTermName.$fieldTypeIdMember)"
-
-            val joinCondition = q"table.${TermName(tableFieldName)}.equal($implicitMapper.table.${TermName(joinTableFieldName)})"
-
-            val join = if (fieldIsOption) {
-              q"(current leftOuterJoin $implicitMapper.table).on($joinCondition)"
-            } else {
-              q"(if(leftJoin) (current leftOuterJoin $implicitMapper.table).on($joinCondition) else (current join $implicitMapper.table).on($joinCondition))"
-            }
-            val leftJoin = if (fieldIsOption) q"true" else q"leftJoin"
-
-            (q"$field = $toEntity(r, aliased)",
-              if (fieldIsOption) {
-                q"e.${TermName(fieldName)}.foreach(o => r.$recordSetter($e2rTypeConversion(o.$fieldTypeIdMember)))"
-              } else {
-                q"r.$recordSetter(${checkNotNullTree(entityFieldConverted, nullInEntityMessage)})"
-              },
-              q"f = f ++ $implicitMapper.${TermName("fields")} ++ Array(table.${TermName(tableFieldName)})",
-              q"current = $join" ::
-                q"current = ($implicitMapper).joinedTable(current, $leftJoin)" :: Nil
-              )
-          }
-      }
-    }.unzip4
-
-    val companion = entityType.typeSymbol.companion
-
-    val code = q"""
+    val body = jooqMacroMapper.tryGenerateByType(tableType = tableType, entityType = entityType, recordType = recordType)
+    body match {
+      case Success(b) =>
+        val code = q"""
       new ${weakTypeOf[JooqMeta[T, R, E]]} {
-        override val table = $table
-        override def joinedTable(t: ${weakTypeOf[Table[Record]]}, leftJoin: Boolean = false) = {
-           var current = t
-           ..${joins.flatten}
-           current
-        }
-        override lazy val fields = {
-          var f = Array.empty[${weakTypeOf[Field[_]]}]
-          ..$mappedFields
-          f
-        }
-        override def toEntityAliased(r: ${weakTypeOf[Record]}, aliased: Boolean = true) = $companion(..$toEntityParams)
-        override def toRecord(e: $entityType, current: $recordType = null.asInstanceOf[$recordType])(implicit dsl: ${weakTypeOf[DSLContext]}): $recordType = {
-          val r = if(current != null) current else dsl.newRecord(table)
-          ..$toRecordParams
-          r
-        }
+        ..$b
       }
     """
+        c.Expr[JooqMeta[T, R, E]] {
+          code
+        }
 
-
-    c.Expr[JooqMeta[T, R, E]] {
-      code
+      case Failure(e: AbortException) =>
+        c.abort(c.enclosingPosition, e.getMessage)
+      case Failure(e) =>
+        throw e
     }
   }
 
 }
+
+import scala.annotation.StaticAnnotation
+
+object meta {
+  type JooqMetaType = JooqMeta[T, R, E] forSome {type E; type R <: Record; type T <: Table[R]}
+}
+
+class meta(namespace: String = "") extends StaticAnnotation {
+  def macroTransform(annottees: Any*): JooqMetaType = macro metaMacro.impl
+}
+
+object metaMacro {
+
+  def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[JooqMetaType] = {
+
+    import c.universe._
+    def expandMacro(parents: Any) = {
+      val namespace = c.macroApplication match {
+        case Apply(Select(Apply(_, List(Literal(Constant(s: String)))), _), _) =>
+          if (s == null.asInstanceOf[String] || s.equals("")) None else Some(s)
+        case _ => None
+      }
+      val jooqMacroMapper = {
+        val n = namespace
+        new {
+          val co: c.type = c
+          val namespace = n
+        } with JooqMacroMapper[c.type]
+      }
+
+      val parentsSeq: Seq[AppliedTypeTree] = parents.asInstanceOf[Seq[AppliedTypeTree]]
+      val rootTypes = parentsSeq.flatMap(p => p.children.headOption.map(t => t.toString().split("\\.").last)).toSet
+      if (!rootTypes.contains("JooqMeta")) {
+        c.abort(c.enclosingPosition, s"Needs to extend JooqMeta")
+      }
+
+      val tableType = parentsSeq.head.children(1)
+      val recordType = parentsSeq.head.children(2)
+      val entityType = parentsSeq.head.children(3)
+
+      val macroBody = jooqMacroMapper.tryGenerateByTree(tableType = tableType, recordType = recordType, entityType = entityType)
+
+      macroBody match {
+        case Success(b) =>
+          b
+        case Failure(e: AbortException) =>
+          c.abort(c.enclosingPosition, e.getMessage)
+        case Failure(e) =>
+          throw e
+      }
+    }
+
+    val result = {
+      annottees.map(_.tree).toList match {
+        case q"$pref object $name extends ..$parents { ..$body }" :: Nil =>
+          val code = q"""
+              object $name extends ..$parents {
+                ..$body
+                ..${expandMacro(parents)}
+              }"""
+          code
+      }
+    }
+    c.Expr[JooqMetaType](result)
+  }
+}
+
