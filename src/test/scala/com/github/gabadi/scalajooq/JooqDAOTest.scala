@@ -7,8 +7,8 @@ import org.jooq.DSLContext
 
 class JooqDAOTest extends BaseSpec {
 
-  lazy val userDAO = new DefaultJooqDAO[UserRecord, User]() {}
   implicit val userMeta = JooqMeta.metaOf[tables.User, UserRecord, User]
+  lazy val userDAO = new DefaultJooqDAO[UserRecord, User]() {}
 
   def insert(user: User)(implicit dsl: DSLContext) = {
     val id = userDAO.insert(user)
