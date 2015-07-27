@@ -23,7 +23,7 @@ class JoinTest extends BaseSpec {
   "Join" when {
     "selectTable" should {
       "has the correct inner join" in DB.withRollback { dsl =>
-        implicit val cityMeta = metaOf[tables.City, CityRecord, City]
+        @meta object cityMeta extends JooqMeta[tables.City, CityRecord, City]
 
         cityMeta.selectTable.toString shouldBe
           (CITY join STATE).
@@ -33,7 +33,7 @@ class JoinTest extends BaseSpec {
             ).toString
       }
       "has the correct outer join" in DB.withRollback { dsl =>
-        implicit lazy val cityOptMeta = metaOf[tables.City, CityRecord, CityOptState]
+        @meta object cityOptMeta extends JooqMeta[tables.City, CityRecord, CityOptState]
 
         cityOptMeta.selectTable.toString shouldBe (
           CITY leftOuterJoin STATE).

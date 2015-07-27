@@ -40,6 +40,9 @@ trait JooqMacroMapper[C <: Context] {
 
   def tryGenerateByType(tableType: Type, recordType: Type, entityType: Type): scala.util.Try[Tree] = {
     scala.util.Try {
+      if(tableType.companion.equals(NoType)) {
+        co.abort(co.enclosingPosition, s"$tableType does not have a companion Object, ensure you are using ScalaCodeGen")
+      }
       val fields = rc.caseClassFields(entityType)
       val table = rc.tableInstanceMethod(tableType)
 
