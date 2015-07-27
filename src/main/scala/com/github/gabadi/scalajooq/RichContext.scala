@@ -4,6 +4,8 @@ import com.github.gabadi.scalajooq.JooqMacroMapper._
 import com.google.common.base.CaseFormat._
 import org.jooq.{Record, RecordMapper}
 
+import scala.reflect.macros.TypecheckException
+
 trait RichContext[C <: Context] {
   self: AbortContext[C] =>
 
@@ -73,6 +75,15 @@ trait RichContext[C <: Context] {
     context.typecheck(q"$qPackage.JooqMeta.materializeType[$t]").tpe.resultType.typeArgs.head
   }
 
+  def treeToTypeOpt(t: Tree) = {
+    try {
+      Some(context.typecheck(q"$qPackage.JooqMeta.materializeType[$t]").tpe.resultType.typeArgs.head)
+    } catch {
+      case e: TypecheckException => None
+    }
+
+  }
+
   def implicitJooqMeta(entityType: Type) = {
     val expectedImplicitMapperType = appliedType(typeOf[RecordMapper[_, _]].typeConstructor, typeOf[Record], entityType)
     val implicitMapper = context.inferImplicitValue(expectedImplicitMapperType)
@@ -94,6 +105,15 @@ trait RichContext[C <: Context] {
   }
 
   def existsMemberStartWith(lookupType: Type)(prefix: String) = lookupType.members.exists(_.name.decodedName.toString.startsWith(prefix))
+
+  def guessJoinTableOpt(anyTable: Type, entity: Type): Option[Type] = {
+    val fieldTypeName = entity.toString.split("\\.").last
+    val upperUnderscoreFieldTypeName = LOWER_CAMEL.to(UPPER_UNDERSCORE, fieldTypeName)
+    context.mirror.staticPackage(anyTable.toString.split("\\.").init.mkString(".")).typeSignature.members.collect{
+      case c: ClassSymbol if c.name.decodedName.toString.equals(fieldTypeName) =>
+        c.companion.typeSignature.member(TermName(upperUnderscoreFieldTypeName)).asMethod.returnType
+    }.headOption
+  }
 
 }
 

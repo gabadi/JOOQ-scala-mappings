@@ -23,8 +23,6 @@ class JoinTest extends BaseSpec {
   "Join" when {
     "selectTable" should {
       "has the correct inner join" in DB.withRollback { dsl =>
-        implicit val countryMeta = metaOf[tables.Country, CountryRecord, Country]
-        implicit val stateMeta = metaOf[tables.State, StateRecord, State]
         implicit val cityMeta = metaOf[tables.City, CityRecord, City]
 
         cityMeta.selectTable.toString shouldBe
@@ -33,18 +31,8 @@ class JoinTest extends BaseSpec {
             join(COUNTRY).
             on(STATE.COUNTRY_ID equal COUNTRY.ID
             ).toString
-        /*
-        cityMeta.selectTable.toString shouldBe
-          (CITY join STATE.as("state")).
-            on(CITY.STATE_ID equal STATE.as("state").ID).
-            join(COUNTRY.as("state_country")).
-            on(STATE.as("state").COUNTRY_ID equal COUNTRY.as("state_country").ID
-            ).toString
-         */
       }
       "has the correct outer join" in DB.withRollback { dsl =>
-        implicit lazy val countryMeta = metaOf[tables.Country, CountryRecord, Country]
-        implicit lazy val stateMeta = metaOf[tables.State, StateRecord, State]
         implicit lazy val cityOptMeta = metaOf[tables.City, CityRecord, CityOptState]
 
         cityOptMeta.selectTable.toString shouldBe (
@@ -53,12 +41,6 @@ class JoinTest extends BaseSpec {
           leftOuterJoin(COUNTRY).
           on(STATE.COUNTRY_ID equal COUNTRY.ID
           ).toString
-        /*          cityOptMeta.selectTable.toString shouldBe (
-                    CITY leftOuterJoin STATE.as("state")).
-                    on(CITY.STATE_ID equal STATE.as("state").ID).
-                    leftOuterJoin(COUNTRY.as("state_country")).
-                    on(STATE.as("state").COUNTRY_ID equal COUNTRY.as("state_country").ID
-                    ).toString*/
       }
     }
 

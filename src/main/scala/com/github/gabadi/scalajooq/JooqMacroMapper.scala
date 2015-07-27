@@ -90,86 +90,19 @@ trait JooqMacroMapper[C <: Context] {
                 }
               }
             case None =>
-              // there is no matching between record and entity
-              rc.implicitJooqMeta(effectiveFieldType) match {
-                // try to create an embedded mapper
-                case None =>
-                  val newNamespace = namespace.map(n => s"$n${fieldName.capitalize}").getOrElse(fieldName)
-                  val newNamespaceUpper = LOWER_CAMEL.to(UPPER_UNDERSCORE, newNamespace)
-                  val mayExistNamespace = rc.existsMemberStartWith(tableType)(newNamespaceUpper)
-                  if (!mayExistNamespace) {
-                    rc.abortFieldNotFoundInRecord(s"$entityType.$fieldName", s"$recordType.$newNamespaceUpper")(None)
-                  } else {
-                    childOf(co, Some(newNamespace)).tryGenerateByType(tableType = tableType, recordType = recordType, entityType = effectiveFieldType) match {
-                      case Success(child) =>
-                        val objectName = s"O${newNamespace.capitalize.drop(namespace.getOrElse("").length)}"
-                        val objectTermName = TermName(objectName)
-                        val childObject = q"object $objectTermName extends ${rc.jooqMeta(tableType, recordType, effectiveFieldType)} {..$child}"
-                        val toEntity = if (fieldIsOption) q"$objectTermName.${TermName("toOptEntity")}" else q"$objectTermName.${TermName("toEntity")}"
+              rc.guessJoinTableOpt(tableType, effectiveFieldType) map { joinTable =>
+                // try to join
+                val joinRecordType = joinTable.decl(TermName("getRecordType")).asMethod.returnType.typeArgs.head
+                childOf(co, namespace).tryGenerateByType(tableType = joinTable, recordType = joinRecordType, entityType = effectiveFieldType) match {
+                  case Success(child) =>
+                    val objectName = s"O${fieldName.capitalize.drop(namespace.getOrElse("").length)}"
+                    val objectTermName = TermName(objectName)
+                    val childObject = q"object $objectTermName extends ${rc.jooqMeta(joinTable, joinRecordType, effectiveFieldType)} {..$child}"
 
-                        val toRecord = q"$objectTermName.${TermName("toRecord")}"
-                        val fieldToRecord = if (fieldIsOption) {
-                          q"e.${TermName(fieldName)}.foreach(o => $toRecord(o, r))"
-                        } else {
-                          q"$toRecord(e.${TermName(fieldName)}, r)"
-                        }
-
-                        (q"$field = $toEntity(r)",
-                          fieldToRecord,
-                          q"lazy val ${TermName(columnNameNoNamespace)} = $objectTermName",
-                          q"f = f ++ $objectTermName.${TermName("fields")}",
-                          Nil,
-                          Some(childObject))
-                      case Failure(e: AbortException) =>
-                        rc.abortFieldCanNotBeMapped(s"$entityType.$fieldName")(Some(e.getMessage))
-                      case Failure(e) =>
-                        throw e
-                    }
-                  }
-                case Some(implicitMapper) =>
-                  val mapperRecordType = {
-                    val toRecordMethod = implicitMapper.tpe.decl(TermName("toRecord"))
-                    if (toRecordMethod.isMethod) {
-                      val recordType = toRecordMethod.asMethod.paramLists.head(1).typeSignature
-                      if (recordType.typeSymbol.isAbstract) {
-                        implicitMapper.tpe.typeArgs(1)
-                      } else {
-                        recordType
-                      }
-                    } else {
-                      rc.abortMissingMappingFor(s"$entityType.$fieldName", effectiveFieldType)(None)
-                    }
-                  }
-                  val toEntity = if (fieldIsOption) q"$implicitMapper.${TermName("toOptEntity")}" else q"$implicitMapper.${TermName("toEntity")}"
-                  if (mapperRecordType.equals(recordType)) {
-                    // resolve like embedded
-
-                    val toRecord = q"$implicitMapper.${TermName("toRecord")}"
-                    val fieldToRecord = if (fieldIsOption) {
-                      q"e.${TermName(fieldName)}.foreach(o => $toRecord(o, r))"
-                    } else {
-                      q"$toRecord(e.${TermName(fieldName)}, r)"
-                    }
-                    (q"$field = $toEntity(r)",
-                      fieldToRecord,
-                      q"lazy val ${TermName(columnNameNoNamespace)} = $implicitMapper",
-                      q"f = f ++ $implicitMapper.${TermName("fields")}",
-                      Nil,
-                      None)
-                  } else {
-                    // try to resolve like a joined entity
                     val idSuffix = {
-                      val joinedTableType = {
-                        val tableType = implicitMapper.tpe.decl(TermName("table")).asMethod.returnType
-                        if (tableType.typeSymbol.isAbstract) {
-                          implicitMapper.tpe.typeArgs.head
-                        } else {
-                          tableType
-                        }
-                      }
                       val maybeMappedMethods = tableMembers.keySet.filter(f => f.startsWith(fieldName))
                       if (maybeMappedMethods.isEmpty) {
-                        rc.abortCanNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")(None)
+                        rc.abortCanNotFindMapIdFieldBetween(joinTable, s"$entityType.$fieldName")(None)
                       } else if (maybeMappedMethods.size == 1) {
                         val suffix = maybeMappedMethods.head.replaceFirst(fieldName, "")
                         s"${suffix.substring(0, 0).toLowerCase}${suffix.substring(1, suffix.length)}"
@@ -182,7 +115,7 @@ trait JooqMacroMapper[C <: Context] {
                           "code"
                         } else {
                           // improve message
-                          rc.abortCanNotFindMapIdFieldBetween(joinedTableType, s"$entityType.$fieldName")(None)
+                          rc.abortCanNotFindMapIdFieldBetween(joinTable, s"$entityType.$fieldName")(None)
                         }
 
                       }
@@ -197,21 +130,23 @@ trait JooqMacroMapper[C <: Context] {
                     val e2rTypeConversion = rc.implicitConversion(from = fieldTypeIdType, to = recordSetterType)
                     val nullInEntityMessage = s"$fieldName in entity ${entityType.typeSymbol.name.decodedName.toString} must not be null"
                     val entityFieldConverted = q"$e2rTypeConversion(e.$fieldTermName.$fieldTypeIdMember)"
+                    val toEntity = if (fieldIsOption) q"$objectTermName.${TermName("toOptEntity")}" else q"$objectTermName.${TermName("toEntity")}"
 
-                    val namespace = q"""namespace.map(n => n + "_" + $fieldNameLowerUnderscore).getOrElse($fieldNameLowerUnderscore)"""
+
+                    val newNamespace = q"""namespace.map(n => n + "_" + $fieldNameLowerUnderscore).getOrElse($fieldNameLowerUnderscore)"""
 
                     //val joinTable = q"$implicitMapper.table.as($namespace)"
-                    val joinTable = q"$implicitMapper.table"
+                    val joinTable2 = q"$objectTermName.${TermName("table")}"
 
                     //val ownTable = q"namespace.map(n => table.as(n)).getOrElse(table)"
                     val ownTable = q"table"
 
-                    val joinCondition = q"$ownTable.${TermName(tableFieldName)}.equal($joinTable.${TermName(joinTableFieldName)})"
+                    val joinCondition = q"$ownTable.${TermName(tableFieldName)}.equal($joinTable2.${TermName(joinTableFieldName)})"
 
                     val join = if (fieldIsOption) {
-                      q"(current leftOuterJoin $joinTable).on($joinCondition)"
+                      q"(current leftOuterJoin $joinTable2).on($joinCondition)"
                     } else {
-                      q"(if(leftJoin) (current leftOuterJoin $joinTable).on($joinCondition) else (current join $joinTable).on($joinCondition))"
+                      q"(if(leftJoin) (current leftOuterJoin $joinTable2).on($joinCondition) else (current join $joinTable2).on($joinCondition))"
                     }
                     val leftJoin = if (fieldIsOption) q"true" else q"leftJoin"
 
@@ -222,12 +157,52 @@ trait JooqMacroMapper[C <: Context] {
                         q"r.$recordSetter(${rc.checkNotNullTree(entityFieldConverted, nullInEntityMessage)})"
                       },
                       q"",
-                      q"f = f ++ $implicitMapper.${TermName("fields")} ++ Array(table.${TermName(tableFieldName)})",
+                      q"f = f ++ ${TermName(objectName)}.${TermName("fields")} ++ Array(table.${TermName(tableFieldName)})",
                       q"current = $join" ::
-                        q"current = ($implicitMapper).joinedTable(current, Some($namespace), $leftJoin)" :: Nil,
-                      None
+                        q"current = ($objectTermName).joinedTable(current, Some($newNamespace), $leftJoin)" :: Nil,
+                      Some(childObject)
                       )
+
+                  case Failure(e: AbortException) =>
+                    rc.abortFieldCanNotBeMapped(s"$entityType.$fieldName")(Some(e.getMessage))
+                  case Failure(e) =>
+                    throw e
+
+                }
+              } getOrElse {
+                // try to embedd
+                val newNamespace = namespace.map(n => s"$n${fieldName.capitalize}").getOrElse(fieldName)
+                val newNamespaceUpper = LOWER_CAMEL.to(UPPER_UNDERSCORE, newNamespace)
+                val mayExistNamespace = rc.existsMemberStartWith(tableType)(newNamespaceUpper)
+                if (!mayExistNamespace) {
+                  rc.abortFieldNotFoundInRecord(s"$entityType.$fieldName", s"$recordType.$newNamespaceUpper")(None)
+                } else {
+                  childOf(co, Some(newNamespace)).tryGenerateByType(tableType = tableType, recordType = recordType, entityType = effectiveFieldType) match {
+                    case Success(child) =>
+                      val objectName = s"O${newNamespace.capitalize.drop(namespace.getOrElse("").length)}"
+                      val objectTermName = TermName(objectName)
+                      val childObject = q"object $objectTermName extends ${rc.jooqMeta(tableType, recordType, effectiveFieldType)} {..$child}"
+                      val toEntity = if (fieldIsOption) q"$objectTermName.${TermName("toOptEntity")}" else q"$objectTermName.${TermName("toEntity")}"
+
+                      val toRecord = q"$objectTermName.${TermName("toRecord")}"
+                      val fieldToRecord = if (fieldIsOption) {
+                        q"e.${TermName(fieldName)}.foreach(o => $toRecord(o, r))"
+                      } else {
+                        q"$toRecord(e.${TermName(fieldName)}, r)"
+                      }
+
+                      (q"$field = $toEntity(r)",
+                        fieldToRecord,
+                        q"lazy val ${TermName(columnNameNoNamespace)} = $objectTermName",
+                        q"f = f ++ $objectTermName.${TermName("fields")}",
+                        Nil,
+                        Some(childObject))
+                    case Failure(e: AbortException) =>
+                      rc.abortFieldCanNotBeMapped(s"$entityType.$fieldName")(Some(e.getMessage))
+                    case Failure(e) =>
+                      throw e
                   }
+                }
               }
           }
         }.unzip6
