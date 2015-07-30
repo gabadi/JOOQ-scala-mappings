@@ -163,16 +163,9 @@ CREATE TABLE `full_user` (
 See that the **FullUser** has an **Id** and we can call the **Profile** an embedded entity inside the **FullUser**, and the **Name** inside the **Profile** may be another embedded entity. <br/>
 And that hierarchy can be mapped with something like this:
 ```
- val nameMeta = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Name]("profileName")
- val profileMeta = JooqMeta.namespacedMetaOf[tables.FullUser, FullUserRecord, Profile]("profile")
  val userMeta = JooqMeta.metaOf[tables.FullUser, FullUserRecord, FullUser]
 ```
-Where the **namespacedMetaOf** does the magic
-If this seams to be too much work, we can simple do:
-```
- val userMeta = JooqMeta.metaOf[tables.FullUser, FullUserRecord, FullUser]
-```
-And with only that, all the other macros will be auto generated.
+This will map all the **profile_*** fields in the record, with the **profile** field in  the **FullUser** and all the **profile_name_*** fields with the **name** field inside the **Profile**
 
 ###Base DAO functionality
 Now, it could be nice to have the most basic functionalities already implemented. For that there is a DAO with the most necessary methods. The usage is as simple as:
@@ -294,11 +287,9 @@ case class Country(id: Long, name: String)
 
 ...
 
-implicit lazy val countryMeta = JooqMeta.metaOf[tables.Country, CountryRecord, Country]
-implicit lazy val stateMeta = JooqMeta.metaOf[tables.State, StateRecord, State]
 implicit lazy val cityMeta = JooqMeta.metaOf[tables.City, CityRecord, City]
 ```
-This **JooqMetas** may be used with the **JooqDAOs**, or simply doing:
+This **JooqMeta** may be used with the **JooqDAOs**, or simply doing:
 ```
    println(cityMeta.query)
 ```
@@ -320,6 +311,7 @@ from "PUBLIC"."CITY"
   on "PUBLIC"."STATE"."COUNTRY_ID" = "PUBLIC"."COUNTRY"."ID"
 ```
 **IMPORTANT:** Only the fetching is done eagerly, but there is no cascade functionality.
+**IMPORTANT:** This functionality uses names conventions, and expects that the entity and the table shares the same name. This limitation will be solved soon with an annotation.
 
 ###Next functionalities
 --------
@@ -338,12 +330,6 @@ case class Profile(firstName: String, lastName: String)
 case class User(id: Long, profile: Profile)
 ```
 In this case, the **User** knowns the **Profile**. And the **Profile** knowns the **User**. So the macro can never be resolved.
- 2. The current version, does not support an the same entity to be referenced twice in the same entity, like in this example.
-```
-case class City(id: Long, name: String)
-
-case class Route(from: City, to: City)
-```
 
 ###Contributing
 ------------
