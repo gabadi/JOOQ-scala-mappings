@@ -17,6 +17,7 @@ import scala.util.matching.Regex.Match
 
 import odelay.Timer.default
 
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object TestSettings {
